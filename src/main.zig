@@ -133,7 +133,7 @@ pub fn main() !void {
         .spacer,
         .{ .Theme = .{ .label = "theme:", .ptr = &config.theme } },
         .{ .FontType = .{ .label = "font:", .ptr = &config.font } },
-        .{ .bool = .{ .label = "fullscreen:", .ptr = &config.fullscreen, .t = "yes", .f = "no" } },
+        .{ .bool = .{ .label = "fullscr:", .ptr = &config.fullscreen, .t = "yes", .f = "no" } },
     };
     var master_editor = MasterEditor{
         .left = &left_menu,
@@ -149,6 +149,7 @@ pub fn main() !void {
             .spacer,
             .{ .bool = .{ .label = "swap btn:", .ptr = &config.swapbuttons, .t = "yes", .f = "no" } },
             .{ .bool = .{ .label = "auto-adv:", .ptr = &config.autoadvance, .t = "yes", .f = "no" } },
+            .{ .bool = .{ .label = "joyless:", .ptr = &config.joyless, .t = "yes", .f = "no" } },
         },
         .current = &left_menu,
     };
@@ -226,7 +227,10 @@ pub fn main() !void {
     cm.openAll();
     defer cm.closeAll();
 
+    var j_mode: JoyMode = .timbre_mod;
+
     mainloop: while (true) {
+        var dont_handle = false;
         if (config.fullscreen != known_fullscreen) {
             known_fullscreen = config.fullscreen;
             _ = sdl.setWindowFullscreen(
@@ -264,19 +268,29 @@ pub fn main() !void {
         tm.clear(colors.normal);
 
         const trig = bh.handle(held, dt, config.swapbuttons);
-        const j_mode: JoyMode = if (trig.hold.l2)
-            .res_feedback
-        else if (trig.hold.r2)
-            .decay_accent
-        else
-            .timbre_mod;
 
-        handleParams(jh.lx, jh.ly, dt, j_mode, &params.bass1);
-        handleParams(jh.rx, jh.ry, dt, j_mode, &params.bass2);
+        if (config.joyless) {
+            if (!dont_handle and (trig.hold.l2 or trig.hold.r2)) {
+                if (trig.hold.l2) joylessHandleParams(trig, j_mode, &params.bass1);
+                if (trig.hold.r2) joylessHandleParams(trig, j_mode, &params.bass2);
 
-        const globalkey = trig.hold.l;
+                if (trig.press.x) j_mode = .timbre_mod;
+                if (trig.press.y) j_mode = .res_feedback;
+                if (trig.press.b) j_mode = .decay_accent;
+                dont_handle = true;
+            }
+        } else {
+            j_mode = if (trig.hold.l2)
+                .res_feedback
+            else if (trig.hold.r2)
+                .decay_accent
+            else
+                .timbre_mod;
+            handleParams(jh.lx, jh.ly, dt, j_mode, &params.bass1);
+            handleParams(jh.rx, jh.ry, dt, j_mode, &params.bass2);
+        }
 
-        if (globalkey) {
+        if (trig.hold.l) {
             if (trig.repeat.up) params.engine.changeTempo(10);
             if (trig.repeat.down) params.engine.changeTempo(-10);
             if (trig.repeat.left) params.engine.changeTempo(-1);
@@ -290,6 +304,7 @@ pub fn main() !void {
             if (trig.press.r) params.engine.mutes.toggle(.rscp);
             if (trig.press.select and !mixer) clipboard.copy(&arranger);
             if (trig.press.start and !mixer) clipboard.paste(&arranger);
+            dont_handle = true;
         } else {
             if (trig.comboPress("select")) mixer = !mixer;
             if (trig.comboPress("start")) Sys.sound_engine.startstop(arranger.row);
@@ -313,18 +328,18 @@ pub fn main() !void {
         if (mixer) {
             if (trig.press.r) mixer_channels = !mixer_channels;
             mixer_editor.handle(trig, mixer_channels);
-            if (!globalkey) master_editor.handle(trig, !mixer_channels);
+            if (!dont_handle) master_editor.handle(trig, !mixer_channels);
             mixer_editor.display(&tm, 1, 14, dt, mixer_channels, colors);
             master_editor.display(&tm, 1, 1, dt, !mixer_channels, colors);
         } else {
-            if (!globalkey and trig.comboPress("r")) {
+            if (!dont_handle and trig.comboPress("r")) {
                 if (arrange) {
                     if (!arranger.selEmpty()) arrange = false;
                 } else arrange = true;
             }
             if (arrange) {
-                if (!globalkey and trig.comboPress("x")) Sys.sound_engine.enqueue(arranger.row);
-                if (!globalkey) {
+                if (!dont_handle and trig.comboPress("x")) Sys.sound_engine.enqueue(arranger.row);
+                if (!dont_handle) {
                     if (arranger.handle(trig)) |request| switch (request) {
                         .clone => Clipboard.clone(&arranger),
                         .new => Clipboard.new(&arranger),
@@ -358,12 +373,12 @@ pub fn main() !void {
                     switch (arranger.column) {
                         0, 1 => {
                             bass_editor.setPattern(p);
-                            if (!globalkey) bass_editor.handle(trig, config.autoadvance);
+                            if (!dont_handle) bass_editor.handle(trig, config.autoadvance);
                             bass_editor.display(&tm, 10, 1, dt, true, pi[arranger.column], colors);
                         },
                         2 => {
                             drum_editor.setPattern(p);
-                            if (!globalkey) drum_editor.handle(trig, config.autoadvance);
+                            if (!dont_handle) drum_editor.handle(trig, config.autoadvance);
                             drum_editor.display(
                                 &tm,
                                 10,
@@ -394,6 +409,52 @@ pub fn main() !void {
         sys.preRender();
         cd.flush(redraw);
         sys.postRender();
+    }
+}
+
+fn joylessHandleParams(trig: ButtonHandler.States, mode: JoyMode, params: *PDBass.Params) void {
+    const single_step: f32 = @as(f32, 1) / 0xff;
+
+    const step = single_step * @as(f32, if (trig.hold.a) 8 else 1);
+
+    var xadd: ?f32 = null;
+    var yadd: ?f32 = null;
+
+    if (trig.repeat.up) yadd = step;
+    if (trig.repeat.down) yadd = -step;
+    if (trig.repeat.left) xadd = -step;
+    if (trig.repeat.right) xadd = step;
+
+    if (xadd) |x| {
+        const prev = switch (mode) {
+            .timbre_mod => params.get(.mod_depth),
+            .res_feedback => params.get(.feedback),
+            .decay_accent => params.get(.accentness),
+        };
+
+        const new: f32 = @min(1, @max(0, x + prev));
+
+        switch (mode) {
+            .timbre_mod => params.setCmp(.mod_depth, new, prev),
+            .res_feedback => params.setCmp(.feedback, new, prev),
+            .decay_accent => params.setCmp(.accentness, new, prev),
+        }
+    }
+
+    if (yadd) |y| {
+        const prev = switch (mode) {
+            .timbre_mod => params.get(.timbre),
+            .res_feedback => params.get(.res),
+            .decay_accent => params.get(.decay),
+        };
+
+        const new: f32 = @min(1, @max(0, y + prev));
+
+        switch (mode) {
+            .timbre_mod => params.setCmp(.timbre, new, prev),
+            .res_feedback => params.setCmp(.res, new, prev),
+            .decay_accent => params.setCmp(.decay, new, prev),
+        }
     }
 }
 

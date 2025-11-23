@@ -29,6 +29,7 @@ font: FontType = .mcr,
 autoadvance: bool = true,
 samples: u16 = 1024,
 fullscreen: bool = false,
+joyless: bool = false,
 
 pub fn load(self: *@This(), dir: std.fs.Dir) !void {
     const file = dir.openFile(configname, .{ .mode = .read_only }) catch |err| {

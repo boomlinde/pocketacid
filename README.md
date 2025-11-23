@@ -94,6 +94,9 @@ buttons. The buttons are named as follows:
 If your face buttons are not laid out like that, you can swap Y with X
 and A with B using the "swap buttons" setting.
 
+If your controller doesn't have joysticks, see the section on the joyless
+mode below.
+
 Globally, you can always control the bassline timbre and envelope using the
 left stick for bassline 1 and right stick for bassline 2. You can hold L2 or
 R2 to control other bassline parameters using the sticks (see below).
@@ -139,6 +142,33 @@ Some controls apply globally across the program:
 | R2          | Momentarily control bassline decay and accent       |
 
 Others are specific to the different sections of the programs described below
+
+### Joyless mode
+
+Although Pocket Acid is primarily designed to be controlled using a dual
+joystick controller, you can activate the *joyless mode* in the settings
+to enable control of the bassline parameters by other means.
+
+While in joyless mode, the L2 and R2 bindings no longer apply. Instead,
+holding either L2 or R2 will control enable the following bindings:
+
+
+| Button(s)   | Effect                                              |
+| ----------- | --------------------------------------------------- |
+| up          | Increase Y parameter                                |
+| down        | Decrease Y parameter                                |
+| left        | Decrease X parameter                                |
+| right       | Increase X parameter                                |
+| A+up        | Increase Y parameter (8x faster)                    |
+| A+down      | Decrease Y parameter (8x faster)                    |
+| A+left      | Decrease X parameter (8x faster)                    |
+| A+right     | Increase X parameter (8x faster)                    |
+| X           | Set the current parameters to timbre and env mod    |
+| Y           | Set the current parameters to res and feedback      |
+| B           | Set the current parameters to decay and accent      |
+
+The dpad buttons apply to either or both of of the bassline synthesizers
+depending on whether you are holding L2, R2 or both.
 
 ## Sections
 
@@ -392,7 +422,7 @@ Controls:
 
     theme: forest  swap btn: no
     font: mcr      auto-adv: yes
-    fullscreen: no
+    fullscr: no    joyless: no
 
 These musical settings are included in snapshots:
 
@@ -414,7 +444,8 @@ These settings concern the whole program and are not included in snapshots:
 * swap btn: swap A with B and X with Y
 * font: font type to use for drawing the screen
 * auto-adv: auto-advance cursor in pattern sequencer or not
-* fullscreen: toggle fullscreen
+* fullscr: toggle fullscreen
+* joyless: activate joyless mode (see Joyless mode in the controls section)
 
 Controls:
 
