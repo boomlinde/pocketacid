@@ -121,25 +121,26 @@ a full set of controls, but can for example be used while sequencing.
 
 Some controls apply globally across the program:
 
-| Button(s)   | Effect                                              |
-| ----------- | --------------------------------------------------- |
-| select      | Toggle sequencer/arranger and mixer/settings        |
-| start       | Toggle playback at current arranger row             |
-| L1+select   | Copy selected pattern                               |
-| L1+start    | Paste selected pattern                              |
-| L1+left     | Decrement tempo                                     |
-| L1+right    | Increment tempo                                     |
-| L1+down     | Decrease tempo by 10 BPM                            |
-| L1+up       | Increase tempo by 10 BPM                            |
-| L1+X        | Toggle mute of bass drum                            |
-| L1+Y        | Toggle mute of snare drum                           |
-| L1+B        | Toggle mute of hihat and cymbal                     |
-| L1+A        | Toggle mute of toms                                 |
-| L1+R1       | Toggle mute of rimshot and clap                     |
-| L1+L2       | Toggle mute of bassline 1                           |
-| L1+R2       | Toggle mute of bassline 2                           |
-| L2          | Momentarily control bassline resonance and feedback |
-| R2          | Momentarily control bassline decay and accent       |
+| Button(s)    | Effect                                              |
+| ------------ | --------------------------------------------------- |
+| select       | Toggle sequencer/arranger and mixer/settings        |
+| start        | Toggle playback at current arranger row             |
+| L1+select    | Copy selected pattern                               |
+| L1+start     | Paste selected pattern                              |
+| L1+left      | Decrement tempo                                     |
+| L1+right     | Increment tempo                                     |
+| L1+down      | Decrease tempo by 10 BPM                            |
+| L1+up        | Increase tempo by 10 BPM                            |
+| L1+X         | Toggle mute of bass drum                            |
+| L1+Y         | Toggle mute of snare drum                           |
+| L1+B         | Toggle mute of hihat and cymbal                     |
+| L1+A         | Toggle mute of toms                                 |
+| L1+R1        | Toggle mute of rimshot and clap                     |
+| L1+L2        | Toggle mute of bassline 1                           |
+| L1+R2        | Toggle mute of bassline 2                           |
+| L2           | Momentarily control bassline resonance and feedback |
+| R2           | Momentarily control bassline decay and accent       |
+| start+select | Exit Pocket Acid                                    |
 
 Others are specific to the different sections of the programs described below
 
