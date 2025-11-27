@@ -249,6 +249,8 @@ Controls:
 | A+down      | Decrease pattern number by 16                       |
 | Y+up        | Save snapshot at current row                        |
 | Y+down      | Load snapshot at current row                        |
+| Y+left      | Delete current row (moving rows below up)           |
+| Y+right     | Insert row before current row                       |
 | Y+B         | Delete snapshot at current row                      |
 | X           | (While playing) Queue the current row               |
 | X           | Start playback at current row but don't change BPM  |

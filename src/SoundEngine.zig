@@ -140,7 +140,8 @@ pub fn everyBuffer(self: *@This()) void {
 
     switch (cmd.t) {
         .startstop => {
-            const snap = &song.snapshots[cmd.row];
+            const snap_idx = @atomicLoad(u8, &song.snap_map[cmd.row], .seq_cst);
+            const snap = &song.snapshots[snap_idx];
             if (!running and snap.active())
                 self.params.set(.bpm, snap.params.engine.get(.bpm));
             self.start(cmd.row, running);
@@ -199,9 +200,10 @@ pub fn next(self: *@This(), srate: f32) Mixer.Frame {
 
     if (tick) {
         if (self.ds.tick()) |row| {
-            if (song.snapshots[row].active() and row != self.snapshot_row) {
-                self.snapshot_row = row;
-                self.global_params.assumeNoTempo(&song.snapshots[row].params);
+            const snap_idx = @atomicLoad(u8, &song.snap_map[row], .seq_cst);
+            if (song.snapshots[snap_idx].active() and snap_idx != self.snapshot_row) {
+                self.snapshot_row = snap_idx;
+                self.global_params.assumeNoTempo(&song.snapshots[snap_idx].params);
                 self.drums.ducker.current = 1;
                 self.pdbass1.short();
                 self.pdbass2.short();

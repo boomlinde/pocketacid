@@ -27,6 +27,14 @@ pub var bass1_arrange: [256]u8 = [1]u8{0xff} ** 256;
 pub var bass2_arrange: [256]u8 = [1]u8{0xff} ** 256;
 pub var drum_arrange: [256]u8 = [1]u8{0xff} ** 256;
 
+// The snap map isn't saved
+pub var snap_map: [256]u8 = snap_map_fill: {
+    var ret: [256]u8 = undefined;
+
+    for (0..256) |i| ret[i] = @intCast(i);
+    break :snap_map_fill ret;
+};
+
 pub fn findEmptyUnusedBassPattern() ?u8 {
     // Index all used patterns
     var used: [255]bool = [1]bool{false} ** 255;

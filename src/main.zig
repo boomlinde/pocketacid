@@ -162,6 +162,7 @@ pub fn main() !void {
             &song.bass2_arrange,
             &song.drum_arrange,
         },
+        .snap_map = &song.snap_map,
     };
 
     loadblock: {
@@ -215,6 +216,7 @@ pub fn main() !void {
                     &arranger,
                     &mixer_editor,
                     &song.snapshots,
+                    &song.snap_map,
                 ) catch |err| {
                     stderr.print("failed to write save: {}\n", .{err}) catch {};
                     break :saveblock;

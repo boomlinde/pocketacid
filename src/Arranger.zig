@@ -31,6 +31,7 @@ const height = 17;
 columns: []const *[256]u8,
 snapshots: *[256]Snapshot,
 params: *Params,
+snap_map: *[256]u8,
 
 upload_anim: ?UploadAnim = null,
 column: u8 = 0,
@@ -100,19 +101,70 @@ pub fn prevStart(self: *Arranger) void {
     }
 }
 
+fn delete(self: *Arranger) void {
+    for (self.columns) |column| {
+        @atomicStore(u8, &column[self.row], 0xff, .seq_cst);
+        arrDelete(column, self.row, 0xff);
+    }
+    const snap_idx = @atomicLoad(u8, &self.snap_map[self.row], .seq_cst);
+    self.snapshots[snap_idx].delete();
+    arrDelete(self.snap_map, self.row, snap_idx);
+}
+
+fn insert(self: *Arranger) void {
+    if (!self.rowEmpty(0xff)) return;
+
+    const last_snap_idx = @atomicLoad(u8, &self.snap_map[0xff], .seq_cst);
+    if (self.snapshots[last_snap_idx].active()) return;
+
+    for (self.columns) |column| {
+        arrInsert(column, self.row, 0xff);
+    }
+
+    arrInsert(self.snap_map, self.row, last_snap_idx);
+}
+
+fn arrDelete(arr: *[256]u8, row: u8, ins: u8) void {
+    for (row..arr.len - 1) |i| {
+        const next = @atomicLoad(u8, &arr[i + 1], .seq_cst);
+        @atomicStore(u8, &arr[i], next, .seq_cst);
+    }
+    @atomicStore(u8, &arr[0xff], ins, .seq_cst);
+}
+
+fn arrInsert(arr: *[256]u8, row: u8, ins: u8) void {
+    var next: u8 = ins;
+    for (row..arr.len) |i| {
+        const cur = @atomicLoad(u8, &arr[i], .seq_cst);
+        @atomicStore(u8, &arr[i], next, .seq_cst);
+        next = cur;
+    }
+}
+
 pub fn handle(self: *Arranger, input: InputState) ?Request {
     const over_addr = &self.columns[self.column].*[self.row];
     const curval = @atomicLoad(u8, over_addr, .seq_cst);
     if (input.hold.any()) self.blink = 0;
 
     if (input.hold.y) {
+        if (input.press.left) self.delete();
+        if (input.press.right) self.insert();
         if (input.press.up) {
-            self.snapshots[self.row].upload(self.params);
-            self.upload_anim = UploadAnim{ .row = self.row };
+            const snap_idx = @atomicLoad(u8, &self.snap_map[self.row], .seq_cst);
+
+            self.snapshots[snap_idx].upload(self.params);
+            self.upload_anim = UploadAnim{ .row = snap_idx };
         }
-        if (input.press.down and self.snapshots[self.row].active())
-            self.params.assumeNoTempo(&self.snapshots[self.row].params);
-        if (input.press.b) self.snapshots[self.row].delete();
+        if (input.press.down) {
+            const snap_idx = @atomicLoad(u8, &self.snap_map[self.row], .seq_cst);
+            if (self.snapshots[snap_idx].active()) {
+                self.params.assumeNoTempo(&self.snapshots[snap_idx].params);
+            }
+        }
+        if (input.press.b) {
+            const snap_idx = @atomicLoad(u8, &self.snap_map[self.row], .seq_cst);
+            self.snapshots[snap_idx].delete();
+        }
 
         self.changed = false;
         return null;
@@ -273,10 +325,12 @@ pub fn display(
 
             var snapshot_color = colors.hilight2;
 
-            if (self.upload_anim) |a| if (a.row == uidx) {
+            const snap_idx = @atomicLoad(u8, &self.snap_map[uidx], .seq_cst);
+
+            if (self.upload_anim) |a| if (a.row == snap_idx) {
                 snapshot_color = a.attrib(colors);
             };
-            if (self.snapshots[uidx].active()) tm.puts(x + 8, y + yoffset, snapshot_color, "\xf0");
+            if (self.snapshots[snap_idx].active()) tm.puts(x + 8, y + yoffset, snapshot_color, "\xf0");
         }
     }
 

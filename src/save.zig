@@ -331,6 +331,7 @@ pub fn save(
     arranger: *const Arranger,
     mixer_editor: *const MixerEditor,
     snapshots: *const [256]Snapshot,
+    snap_map: *const [256]u8,
 ) !void {
     try writeChunk(.ARR1, 1, arr1, w);
     try writeChunk(.ARR2, 1, arr2, w);
@@ -401,8 +402,9 @@ pub fn save(
         const hw = handle.w.writer().any();
 
         for (0..256) |i| {
-            try hw.writeInt(u8, if (@atomicLoad(bool, &snapshots[i].enabled, .seq_cst)) 1 else 0, .little);
-            try writeParams(hw, &snapshots[i].params);
+            const snap_idx = @atomicLoad(u8, &snap_map[i], .seq_cst);
+            try hw.writeInt(u8, if (snapshots[snap_idx].active()) 1 else 0, .little);
+            try writeParams(hw, &snapshots[snap_idx].params);
         }
     }
     try handle.finalize(w);
