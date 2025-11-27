@@ -184,6 +184,9 @@ between using the select and R1 buttons:
 
 The sections are described in greater detail below.
 
+Regardless of which section you're in, the current tempo, playback status
+and mute state will be displayed at the top of the screen area.
+
 ### Arranger
 
     00......

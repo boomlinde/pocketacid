@@ -329,6 +329,7 @@ pub fn main() !void {
         }
         if (Sys.sound_engine.isRunning()) tm.putch(0, 0, colors.playing, 0x10);
         tm.print(1, 0, colors.normal, "{}", .{params.engine.get(.bpm)});
+        params.engine.mutes.display(colors, &tm, 22, 0);
 
         const pi: []const PlaybackInfo = &[_]PlaybackInfo{
             Sys.sound_engine.bs1.playbackInfo(),

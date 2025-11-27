@@ -22,6 +22,8 @@ const Mixer = @import("Mixer.zig");
 const midi = @import("midi.zig");
 const Accessor = @import("Accessor.zig").Accessor;
 const Ducker = @import("Ducker.zig");
+const TextMatrix = @import("TextMatrix.zig");
+const Theme = @import("Theme.zig");
 
 pub const Mutes = packed struct(u8) {
     pub const Group = enum { bd, sd, hhcy, tm, b1, b2, rscp };
@@ -49,6 +51,30 @@ pub const Mutes = packed struct(u8) {
         return switch (group) {
             inline else => |v| @field(copy, @tagName(v)),
         };
+    }
+
+    pub fn display(self: *const Mutes, theme: *const Theme, tm: *TextMatrix, x: usize, y: usize) void {
+        const Pair = struct { muted: bool, char: u8 };
+        const m = @atomicLoad(Mutes, self, .seq_cst);
+
+        const pairs = [_]Pair{
+            .{ .char = '1', .muted = m.b1 },
+            .{ .char = '2', .muted = m.b2 },
+            .{ .char = 'b', .muted = m.bd },
+            .{ .char = 's', .muted = m.sd },
+            .{ .char = 'h', .muted = m.hhcy },
+            .{ .char = 't', .muted = m.tm },
+            .{ .char = 'r', .muted = m.rscp },
+        };
+
+        for (&pairs, 0..) |pair, i| {
+            const attrib = if (pair.muted)
+                theme.hilight
+            else
+                theme.hilight2;
+
+            tm.putch(x + i, y, attrib, pair.char);
+        }
     }
 };
 pub const Params = struct {
