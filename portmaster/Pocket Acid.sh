@@ -32,7 +32,7 @@ export SDL_GAMECONTROLLERCONFIG="$sdl_controllerconfig"
 
 
 
-$GPTOKEYB "pocketacid.aarch64" &
-pm_platform_helper "$GAMEDIR/pocketacid.aarch64"
+# $GPTOKEYB "pocketacid.aarch64" &
+type pm_platform_helper >/dev/null 2>&1 && pm_platform_helper "$GAMEDIR/pocketacid.aarch64"
 ./pocketacid.aarch64 --nokeyboard ./conf
 pm_finish

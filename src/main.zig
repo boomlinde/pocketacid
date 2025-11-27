@@ -166,13 +166,16 @@ pub fn main() !void {
 
     loadblock: {
         const file = savedir.openFile(savename, .{ .mode = .read_only }) catch |err| {
-            if (err == error.FileNotFound) break :loadblock else return err;
+            if (err == error.FileNotFound) break :loadblock else {
+                stderr.print("failed to open save file: {}\n", .{err}) catch {};
+                return err;
+            }
         };
         defer file.close();
 
         var br = std.io.bufferedReader(file.reader());
 
-        try save.load(
+        save.load(
             br.reader().any(),
             &params,
             &song.bass1_arrange,
@@ -183,7 +186,10 @@ pub fn main() !void {
             &arranger,
             &mixer_editor,
             &song.snapshots,
-        );
+        ) catch |err| {
+            stderr.print("failed to load save file: {}\n", .{err}) catch {};
+            return err;
+        };
     }
 
     Sys.sound_engine.resetDelay();
@@ -191,7 +197,10 @@ pub fn main() !void {
     defer {
         saveblock: {
             {
-                const f = savedir.createFile(savename ++ ".tmp", .{}) catch break :saveblock;
+                const f = savedir.createFile(savename ++ ".tmp", .{}) catch |err| {
+                    stderr.print("failed to create temporary save file: {}\n", .{err}) catch {};
+                    break :saveblock;
+                };
                 const writer = f.writer().any();
                 defer f.close();
 
@@ -206,9 +215,15 @@ pub fn main() !void {
                     &arranger,
                     &mixer_editor,
                     &song.snapshots,
-                ) catch break :saveblock;
+                ) catch |err| {
+                    stderr.print("failed to write save: {}\n", .{err}) catch {};
+                    break :saveblock;
+                };
             }
-            savedir.rename(savename ++ ".tmp", savename) catch {};
+            savedir.rename(savename ++ ".tmp", savename) catch |err| {
+                stderr.print("failed to rename temporary save file: {}\n", .{err}) catch {};
+                break :saveblock;
+            };
         }
     }
 
@@ -268,6 +283,9 @@ pub fn main() !void {
         tm.clear(colors.normal);
 
         const trig = bh.handle(held, dt, config.swapbuttons);
+
+        if (trig.comboPress("start+select") or trig.comboPress("select+start"))
+            break :mainloop;
 
         if (config.joyless) {
             if (!dont_handle and (trig.hold.l2 or trig.hold.r2)) {
