@@ -125,8 +125,8 @@ Some controls apply globally across the program:
 | ------------ | --------------------------------------------------- |
 | select       | Toggle sequencer/arranger and mixer/settings        |
 | start        | Toggle playback at current arranger row             |
-| L1+select    | Copy selected pattern                               |
-| L1+start     | Paste selected pattern                              |
+| L1+select    | Copy selected pattern content                       |
+| L1+start     | Paste selected pattern content                      |
 | L1+left      | Decrement tempo                                     |
 | L1+right     | Increment tempo                                     |
 | L1+down      | Decrease tempo by 10 BPM                            |
