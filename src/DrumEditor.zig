@@ -32,6 +32,12 @@ drumtype: DrumPattern.DrumType = .bd,
 pub fn handle(self: *@This(), input: InputState, autoadvance: bool) void {
     if (input.hold.any()) self.blink = 0;
 
+    if (input.hold.x) {
+        if (input.repeat.left) self.rotLeft();
+        if (input.repeat.right) self.rotRight();
+        return;
+    }
+
     if (input.hold.y) {
         if (input.repeat.left) self.selectedPattern().decLength();
         if (input.repeat.right) self.selectedPattern().incLength();
@@ -131,4 +137,24 @@ inline fn prevIdx(self: *@This()) void {
         (self.idx - 1) % self.selectedPattern().len
     else
         self.selectedPattern().len - 1;
+}
+
+fn rotLeft(self: *@This()) void {
+    const p = self.selectedPattern();
+    const plen = p.length();
+    const first = p.steps[0].copy();
+    for (1..plen) |i| p.steps[i - 1].assume(p.steps[i].copy());
+    p.steps[plen - 1].assume(first);
+}
+
+fn rotRight(self: *@This()) void {
+    const p = self.selectedPattern();
+    const plen = p.length();
+
+    var prev = p.steps[plen - 1].copy();
+    for (0..plen) |i| {
+        const tmp = p.steps[i].copy();
+        p.steps[i].assume(prev);
+        prev = tmp;
+    }
 }

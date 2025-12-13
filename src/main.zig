@@ -325,10 +325,9 @@ pub fn main() !void {
             if (trig.press.select and !mixer) clipboard.copy(&arranger);
             if (trig.press.start and !mixer) clipboard.paste(&arranger);
             dont_handle = true;
-        } else {
-            if (trig.comboPress("select")) mixer = !mixer;
-            if (trig.comboPress("start")) Sys.sound_engine.startstop(arranger.row);
         }
+        if (trig.comboPress("select")) mixer = !mixer;
+        if (trig.comboPress("start")) Sys.sound_engine.startstop(arranger.row);
         if (Sys.sound_engine.isRunning()) tm.putch(0, 0, colors.playing, 0x10);
         tm.print(1, 0, colors.normal, "{}", .{params.engine.get(.bpm)});
         params.engine.mutes.display(colors, &tm, 22, 0);

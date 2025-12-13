@@ -376,6 +376,8 @@ Controls:
 | B           | Remove trigger and advance cursor                   |
 | Y+left      | Decrement pattern length                            |
 | Y+right     | Increment pattern length                            |
+| X+left      | Rotate pattern left                                 |
+| X+right     | Rotate pattern right                                |
 | R1          | Switch to arranger                                  |
 
 ### Mixer
