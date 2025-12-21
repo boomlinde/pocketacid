@@ -39,6 +39,7 @@ const MasterEditor = @import("MasterEditor.zig");
 const Clipboard = @import("Clipboard.zig");
 const Params = @import("Params.zig");
 const Config = @import("Config.zig");
+const InputState = @import("ButtonHandler.zig").States;
 
 const w = 30;
 const h = 22;
@@ -338,97 +339,84 @@ pub fn main() !void {
             Sys.sound_engine.ds.playbackInfo(),
         };
 
-        const qi: []const ?u8 = &[_]?u8{
-            Sys.sound_engine.bs1.queued(),
-            Sys.sound_engine.bs2.queued(),
-            Sys.sound_engine.ds.queued(),
-        };
+        defer {
+            sys.preRender();
+            cd.flush(redraw);
+            sys.postRender();
+        }
 
-        // TODO clean this shit up
         if (mixer) {
             if (trig.press.r) mixer_channels = !mixer_channels;
             mixer_editor.handle(trig, mixer_channels);
             if (!dont_handle) master_editor.handle(trig, !mixer_channels);
             mixer_editor.display(&tm, 1, 14, dt, mixer_channels, colors);
             master_editor.display(&tm, 1, 1, dt, !mixer_channels, colors);
-        } else {
-            if (!dont_handle and trig.comboPress("r")) {
-                if (arrange) {
-                    if (!arranger.selEmpty()) arrange = false;
-                } else arrange = true;
-            }
+            continue :mainloop;
+        }
+        if (!dont_handle and trig.comboPress("r")) {
             if (arrange) {
-                if (!dont_handle and trig.comboPress("x")) Sys.sound_engine.enqueue(arranger.row);
-                if (!dont_handle) {
-                    if (arranger.handle(trig)) |request| switch (request) {
-                        .clone => Clipboard.clone(&arranger),
-                        .new => Clipboard.new(&arranger),
-                    };
-                }
-                if (arranger.selectedPattern()) |p| {
-                    switch (arranger.column) {
-                        0, 1 => {
-                            bass_editor.setPattern(p);
-                            bass_editor.display(&tm, 10, 1, dt, false, pi[arranger.column], colors);
-                        },
-                        2 => {
-                            drum_editor.setPattern(p);
-                            drum_editor.display(
-                                &tm,
-                                10,
-                                1,
-                                dt,
-                                false,
-                                pi[arranger.column],
-                                params.engine.get(.mutes),
-                                colors,
-                            );
-                        },
-                        else => {},
-                    }
-                }
-                arranger.display(&tm, 1, 2, dt, true, pi, qi, colors);
-            } else {
-                if (arranger.selectedPattern()) |p| {
-                    switch (arranger.column) {
-                        0, 1 => {
-                            bass_editor.setPattern(p);
-                            if (!dont_handle) bass_editor.handle(trig, config.autoadvance);
-                            bass_editor.display(&tm, 10, 1, dt, true, pi[arranger.column], colors);
-                        },
-                        2 => {
-                            drum_editor.setPattern(p);
-                            if (!dont_handle) drum_editor.handle(trig, config.autoadvance);
-                            drum_editor.display(
-                                &tm,
-                                10,
-                                1,
-                                dt,
-                                true,
-                                pi[arranger.column],
-                                params.engine.get(.mutes),
-                                colors,
-                            );
-                        },
-                        else => {},
-                    }
-                }
-                arranger.display(&tm, 1, 2, 0, false, pi, qi, colors);
-            }
-
-            const lxy = j_mode.values(&params.bass1);
-            const rxy = j_mode.values(&params.bass2);
-            tm.print(1, 20, colors.hilight2, "{s: <14}", .{j_mode.str()});
-
-            const lcolor = if (params.engine.mutes.get(.b1)) colors.hilight else colors.hilight2;
-            const rcolor = if (params.engine.mutes.get(.b2)) colors.hilight else colors.hilight2;
-            tm.print(15, 20, lcolor, "{x:0>2}/{x:0>2}", .{ lxy.y, lxy.x });
-            tm.print(24, 20, rcolor, "{x:0>2}/{x:0>2}", .{ rxy.y, rxy.x });
+                if (!arranger.selEmpty()) arrange = false;
+            } else arrange = true;
         }
 
-        sys.preRender();
-        cd.flush(redraw);
-        sys.postRender();
+        if (arrange) {
+            if (!dont_handle and trig.comboPress("x")) Sys.sound_engine.enqueue(arranger.row);
+            if (!dont_handle) {
+                if (arranger.handle(trig)) |request| switch (request) {
+                    .clone => Clipboard.clone(&arranger),
+                    .new => Clipboard.new(&arranger),
+                };
+            }
+        }
+        if (arranger.selectedPattern()) |p| {
+            switch (arranger.column) {
+                0, 1 => {
+                    bass_editor.setPattern(p);
+                    if (!arrange and !dont_handle) bass_editor.handle(trig, config.autoadvance);
+                    bass_editor.display(
+                        &tm,
+                        10,
+                        1,
+                        dt,
+                        !arrange,
+                        pi[arranger.column],
+                        colors,
+                    );
+                },
+                2 => {
+                    drum_editor.setPattern(p);
+                    if (!arrange and !dont_handle) drum_editor.handle(trig, config.autoadvance);
+                    drum_editor.display(
+                        &tm,
+                        10,
+                        1,
+                        dt,
+                        !arrange,
+                        pi[arranger.column],
+                        params.engine.get(.mutes),
+                        colors,
+                    );
+                },
+                else => {},
+            }
+        }
+
+        const qi: []const ?u8 = &[_]?u8{
+            Sys.sound_engine.bs1.queued(),
+            Sys.sound_engine.bs2.queued(),
+            Sys.sound_engine.ds.queued(),
+        };
+
+        arranger.display(&tm, 1, 2, dt, arrange, pi, qi, colors);
+
+        const lxy = j_mode.values(&params.bass1);
+        const rxy = j_mode.values(&params.bass2);
+        tm.print(1, 20, colors.hilight2, "{s: <14}", .{j_mode.str()});
+
+        const lcolor = if (params.engine.mutes.get(.b1)) colors.hilight else colors.hilight2;
+        const rcolor = if (params.engine.mutes.get(.b2)) colors.hilight else colors.hilight2;
+        tm.print(15, 20, lcolor, "{x:0>2}/{x:0>2}", .{ lxy.y, lxy.x });
+        tm.print(24, 20, rcolor, "{x:0>2}/{x:0>2}", .{ rxy.y, rxy.x });
     }
 }
 
