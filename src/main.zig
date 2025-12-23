@@ -40,15 +40,20 @@ const Clipboard = @import("Clipboard.zig");
 const Params = @import("Params.zig");
 const Config = @import("Config.zig");
 const InputState = @import("ButtonHandler.zig").States;
+const ProjectPicker = @import("ProjectPicker.zig");
 
 const w = 30;
 const h = 22;
-const savename = "state.sav";
+
+const Opts = struct {
+    nokeyboard: bool = false,
+    savepath_override: ?[]const u8 = null,
+};
 
 pub fn main() !void {
-    var known_fullscreen = false;
-
+    // Parse args
     const stderr = std.io.getStdErr().writer().any();
+    var opts = Opts{};
 
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer {
@@ -59,41 +64,87 @@ pub fn main() !void {
     const args = try std.process.argsAlloc(arena.allocator());
     defer std.process.argsFree(arena.allocator(), args);
 
-    var nokeyboard = false;
-    var savepath_override: ?[]const u8 = null;
     for (args[1..]) |arg| {
         if (std.mem.eql(u8, arg, "--help")) {
             help(stderr, args[0]);
             return;
         }
         if (std.mem.eql(u8, arg, "--nokeyboard")) {
-            nokeyboard = true;
+            opts.nokeyboard = true;
             continue;
         }
-        if (savepath_override == null)
-            savepath_override = arg
+        if (opts.savepath_override == null)
+            opts.savepath_override = arg
         else {
             help(stderr, args[0]);
             std.process.exit(1);
         }
     }
 
+    // Init system
     var sys = try Sys.init(w * 8, h * 8);
     defer sys.cleanup();
 
-    var savedir = if (savepath_override) |sp|
-        try std.fs.cwd().openDir(sp, .{})
+    // Get savedir
+    var savedir = if (opts.savepath_override) |sp|
+        try std.fs.cwd().openDir(sp, .{ .iterate = true })
     else pathsblk: {
         const paths = try sys.paths();
         defer paths.deinit();
-        break :pathsblk try std.fs.cwd().openDir(paths.pref, .{});
+        break :pathsblk try std.fs.cwd().openDir(paths.pref, .{ .iterate = true });
     };
     defer savedir.close();
 
+    // Get config
     var config = Config{};
-
     try config.load(savedir);
     defer config.save(savedir) catch {};
+
+    // Migrate old savefile
+    try ProjectPicker.migrate(savedir);
+
+    // Start controller manager
+    var cm = ControllerManager{};
+
+    cm.openAll();
+    defer cm.closeAll();
+
+    // Run sequencer
+    var known_fullscreen = false;
+    var clipboard = Clipboard{};
+    while (true) {
+        var pp = ProjectPicker{ .dir = savedir, .cursor = config.project };
+        switch (try sequencer(
+            &sys,
+            savedir,
+            &config,
+            opts.nokeyboard,
+            &pp,
+            &known_fullscreen,
+            &cm,
+            &clipboard,
+        )) {
+            .exit => break,
+            .reload => {},
+        }
+    }
+}
+
+const SeqReturn = enum { exit, reload };
+
+pub fn sequencer(
+    sys: *Sys,
+    savedir: std.fs.Dir,
+    config: *Config,
+    nokeyboard: bool,
+    pp: *ProjectPicker,
+    known_fullscreen: *bool,
+    cm: *ControllerManager,
+    clipboard: *Clipboard,
+) !SeqReturn {
+    song.init();
+
+    var skipsave = false;
 
     var params = Params{};
 
@@ -111,11 +162,9 @@ pub fn main() !void {
     var held = ButtonState{};
     var jh = JoystickHandler{};
     var bh = ButtonHandler{};
-    var cm = ControllerManager{};
 
     var mixer_channels = true;
 
-    var clipboard = Clipboard{};
     var bass_editor = BassEditor{ .bank = &song.bass_patterns };
     var drum_editor = DrumEditor{ .bank = &song.drum_patterns };
     var mixer_editor = MixerEditor{ .channels = &params.mixer, .mixer = &Sys.sound_engine.mixer };
@@ -136,6 +185,7 @@ pub fn main() !void {
         .{ .FontType = .{ .label = "font:", .ptr = &config.font } },
         .{ .bool = .{ .label = "fullscr:", .ptr = &config.fullscreen, .t = "yes", .f = "no" } },
     };
+
     var master_editor = MasterEditor{
         .left = &left_menu,
         .right = &.{
@@ -166,71 +216,37 @@ pub fn main() !void {
         .snap_map = &song.snap_map,
     };
 
-    loadblock: {
-        const file = savedir.openFile(savename, .{ .mode = .read_only }) catch |err| {
-            if (err == error.FileNotFound) break :loadblock else {
-                stderr.print("failed to open save file: {}\n", .{err}) catch {};
-                return err;
-            }
-        };
-        defer file.close();
+    const save_state = save.State{
+        .params = &params,
+        .arr1 = &song.bass1_arrange,
+        .arr2 = &song.bass2_arrange,
+        .arr3 = &song.drum_arrange,
+        .bpat = &song.bass_patterns,
+        .dpat = &song.drum_patterns,
+        .arranger = &arranger,
+        .mixer_editor = &mixer_editor,
+        .snapshots = &song.snapshots,
+        .snap_map = &song.snap_map,
+    };
 
-        var br = std.io.bufferedReader(file.reader());
-
-        save.load(
-            br.reader().any(),
-            &params,
-            &song.bass1_arrange,
-            &song.bass2_arrange,
-            &song.drum_arrange,
-            &song.bass_patterns,
-            &song.drum_patterns,
-            &arranger,
-            &mixer_editor,
-            &song.snapshots,
-        ) catch |err| {
-            stderr.print("failed to load save file: {}\n", .{err}) catch {};
-            return err;
-        };
+    try save.load(
+        savedir,
+        ProjectPicker.name(config.project),
+        save_state,
+    );
+    defer {
+        if (!skipsave) save.save(
+            savedir,
+            ProjectPicker.name(config.project),
+            ProjectPicker.tmpName(config.project),
+            save_state,
+        );
     }
 
     Sys.sound_engine.resetDelay();
 
-    defer {
-        saveblock: {
-            {
-                const f = savedir.createFile(savename ++ ".tmp", .{}) catch |err| {
-                    stderr.print("failed to create temporary save file: {}\n", .{err}) catch {};
-                    break :saveblock;
-                };
-                const writer = f.writer().any();
-                defer f.close();
-
-                save.save(
-                    writer,
-                    &params,
-                    &song.bass1_arrange,
-                    &song.bass2_arrange,
-                    &song.drum_arrange,
-                    &song.bass_patterns,
-                    &song.drum_patterns,
-                    &arranger,
-                    &mixer_editor,
-                    &song.snapshots,
-                    &song.snap_map,
-                ) catch |err| {
-                    stderr.print("failed to write save: {}\n", .{err}) catch {};
-                    break :saveblock;
-                };
-            }
-            savedir.rename(savename ++ ".tmp", savename) catch |err| {
-                stderr.print("failed to rename temporary save file: {}\n", .{err}) catch {};
-                break :saveblock;
-            };
-        }
-    }
-
     try sys.startAudio(config.samples);
+    defer sys.stopAudio();
 
     var cd = CharDisplay{
         .w = w,
@@ -242,21 +258,25 @@ pub fn main() !void {
         .fonttype = &config.font,
     };
 
-    cm.openAll();
-    defer cm.closeAll();
-
     var j_mode: JoyMode = .timbre_mod;
+    var pick_project = false;
 
     mainloop: while (true) {
+        var redraw = false;
+        defer {
+            sys.preRender();
+            cd.flush(redraw);
+            sys.postRender();
+        }
+
         var dont_handle = false;
-        if (config.fullscreen != known_fullscreen) {
-            known_fullscreen = config.fullscreen;
+        if (config.fullscreen != known_fullscreen.*) {
+            known_fullscreen.* = config.fullscreen;
             _ = sdl.setWindowFullscreen(
                 sys.w,
                 if (config.fullscreen) sdl.WINDOW_FULLSCREEN_DESKTOP else 0,
             );
         }
-        var redraw = false;
         const colors = config.theme.resolve();
         const current_t = sdl.getPerformanceCounter();
         const dt: f32 = @floatCast(@as(f64, @floatFromInt(current_t -% last_t)) / perf_freq);
@@ -289,6 +309,45 @@ pub fn main() !void {
 
         if (trig.comboPress("start+select") or trig.comboPress("select+start"))
             break :mainloop;
+
+        if (pick_project) {
+            if (try pp.handle(trig)) |req| switch (req) {
+                .switch_project => {
+                    if (config.project != pp.cursor) {
+                        save.save(
+                            savedir,
+                            ProjectPicker.name(config.project),
+                            ProjectPicker.tmpName(config.project),
+                            save_state,
+                        );
+                        config.project = pp.cursor;
+                        skipsave = true;
+                        return .reload;
+                    }
+                    pick_project = false;
+                },
+                .copy_project => {
+                    save.save(
+                        savedir,
+                        ProjectPicker.name(pp.cursor),
+                        ProjectPicker.tmpName(pp.cursor),
+                        save_state,
+                    );
+                    try pp.updateAvail();
+                },
+                .close_picker => {
+                    pick_project = false;
+                    pp.cursor = config.project;
+                },
+            };
+            pp.display(&tm, 1, 1, dt, colors);
+            continue :mainloop;
+        }
+
+        if (trig.hold.l2 and trig.hold.r2 and trig.press.start and !pick_project) {
+            try pp.updateAvail();
+            pick_project = true;
+        }
 
         if (config.joyless) {
             if (!dont_handle and (trig.hold.l2 or trig.hold.r2)) {
@@ -338,12 +397,6 @@ pub fn main() !void {
             Sys.sound_engine.bs2.playbackInfo(),
             Sys.sound_engine.ds.playbackInfo(),
         };
-
-        defer {
-            sys.preRender();
-            cd.flush(redraw);
-            sys.postRender();
-        }
 
         if (mixer) {
             if (trig.press.r) mixer_channels = !mixer_channels;
@@ -418,6 +471,8 @@ pub fn main() !void {
         tm.print(15, 20, lcolor, "{x:0>2}/{x:0>2}", .{ lxy.y, lxy.x });
         tm.print(24, 20, rcolor, "{x:0>2}/{x:0>2}", .{ rxy.y, rxy.x });
     }
+
+    return .exit;
 }
 
 fn joylessHandleParams(trig: ButtonHandler.States, mode: JoyMode, params: *PDBass.Params) void {

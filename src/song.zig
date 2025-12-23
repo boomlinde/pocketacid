@@ -19,13 +19,23 @@ const DrumPattern = @import("DrumPattern.zig");
 const BassPattern = @import("BassPattern.zig");
 const Snapshot = @import("Snapshot.zig");
 
-pub var bass_patterns: [256]BassPattern = [1]BassPattern{.{}} ** 256;
-pub var drum_patterns: [256]DrumPattern = [1]DrumPattern{.{}} ** 256;
-pub var snapshots: [256]Snapshot = [1]Snapshot{.{}} ** 256;
+pub var bass_patterns: [256]BassPattern = undefined;
+pub var drum_patterns: [256]DrumPattern = undefined;
+pub var snapshots: [256]Snapshot = undefined;
 
-pub var bass1_arrange: [256]u8 = [1]u8{0xff} ** 256;
-pub var bass2_arrange: [256]u8 = [1]u8{0xff} ** 256;
-pub var drum_arrange: [256]u8 = [1]u8{0xff} ** 256;
+pub var bass1_arrange: [256]u8 = undefined;
+pub var bass2_arrange: [256]u8 = undefined;
+pub var drum_arrange: [256]u8 = undefined;
+
+pub fn init() void {
+    bass_patterns = [1]BassPattern{.{}} ** 256;
+    drum_patterns = [1]DrumPattern{.{}} ** 256;
+    snapshots = [1]Snapshot{.{}} ** 256;
+
+    bass1_arrange = [1]u8{0xff} ** 256;
+    bass2_arrange = [1]u8{0xff} ** 256;
+    drum_arrange = [1]u8{0xff} ** 256;
+}
 
 // The snap map isn't saved
 pub var snap_map: [256]u8 = snap_map_fill: {

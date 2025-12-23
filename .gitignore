@@ -1,6 +1,7 @@
 zig-out
 .zig-cache
-state.sav
+*.sav
+*.sav.bak
 settings.cfg
 release
 prereqs

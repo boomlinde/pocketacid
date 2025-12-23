@@ -30,6 +30,7 @@ autoadvance: bool = true,
 samples: u16 = 1024,
 fullscreen: bool = false,
 joyless: bool = false,
+project: u8 = 0x00,
 
 pub fn load(self: *@This(), dir: std.fs.Dir) !void {
     const file = dir.openFile(configname, .{ .mode = .read_only }) catch |err| {

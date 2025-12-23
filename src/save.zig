@@ -61,6 +61,19 @@ pub const ChunkTag = enum {
     }
 };
 
+pub const State = struct {
+    params: *Params,
+    arr1: *[256]u8,
+    arr2: *[256]u8,
+    arr3: *[256]u8,
+    bpat: *[256]BassPattern,
+    dpat: *[256]DrumPattern,
+    arranger: *Arranger,
+    mixer_editor: *MixerEditor,
+    snapshots: *[256]Snapshot,
+    snap_map: *[256]u8,
+};
+
 fn writeChunk(tag: ChunkTag, version: u16, data: []const u8, w: std.io.AnyWriter) !void {
     if (data.len > 0xffff) return error.TooBigChunk;
 
@@ -88,18 +101,46 @@ fn beginChunk(tag: ChunkTag, version: u16) ChunkHandle {
     };
 }
 
-pub fn load(
-    r: std.io.AnyReader,
-    params: *Params,
-    arr1: *[256]u8,
-    arr2: *[256]u8,
-    arr3: *[256]u8,
-    bpat: *[256]BassPattern,
-    dpat: *[256]DrumPattern,
-    arranger: *Arranger,
-    mixer_editor: *MixerEditor,
-    snapshots: *[256]Snapshot,
-) !void {
+pub fn load(dir: std.fs.Dir, fname: []const u8, state: State) !void {
+    const stderr = std.io.getStdErr().writer().any();
+    const file = dir.openFile(fname, .{ .mode = .read_only }) catch |err| {
+        if (err == error.FileNotFound) return else {
+            stderr.print("failed to open save file: {}\n", .{err}) catch {};
+            return err;
+        }
+    };
+    defer file.close();
+
+    var br = std.io.bufferedReader(file.reader());
+
+    loadReader(br.reader().any(), state) catch |err| {
+        stderr.print("failed to load save file: {}\n", .{err}) catch {};
+        return err;
+    };
+}
+
+pub fn save(dir: std.fs.Dir, fname: []const u8, tmpname: []const u8, state: State) void {
+    const stderr = std.io.getStdErr().writer().any();
+    {
+        const f = dir.createFile(tmpname, .{}) catch |err| {
+            stderr.print("failed to create temporary save file: {}\n", .{err}) catch {};
+            return;
+        };
+        const writer = f.writer().any();
+        defer f.close();
+
+        saveWriter(writer, state) catch |err| {
+            stderr.print("failed to write save: {}\n", .{err}) catch {};
+            return;
+        };
+    }
+    dir.rename(tmpname, fname) catch |err| {
+        stderr.print("failed to rename temporary save file: {}\n", .{err}) catch {};
+        return;
+    };
+}
+
+pub fn loadReader(r: std.io.AnyReader, s: State) !void {
     chunkloop: while (true) {
         var tagnamebuf: [4]u8 = undefined;
         r.readNoEof(&tagnamebuf) catch |err| {
@@ -113,22 +154,17 @@ pub fn load(
         const len = try r.readInt(u16, .little);
 
         switch (tag) {
-            .ARRS => try readArrangerState(r, arranger, version, len),
-            .BPAT => try readBassPatterns(r, bpat, version, len),
-            .DPAT => try readDrumPatterns(r, dpat, version, len),
-            .ARR1 => try readArr(r, arr1, version, len),
-            .ARR2 => try readArr(r, arr2, version, len),
-            .ARR3 => try readArr(r, arr3, version, len),
-            .MXED => try readMixerEditorState(r, mixer_editor, version, len),
-            .PARM => try readParams(r, params, version, len),
-            .SNAP => try readSnapshots(r, snapshots, version, len),
+            .ARRS => try readArrangerState(r, s.arranger, version, len),
+            .BPAT => try readBassPatterns(r, s.bpat, version, len),
+            .DPAT => try readDrumPatterns(r, s.dpat, version, len),
+            .ARR1 => try readArr(r, s.arr1, version, len),
+            .ARR2 => try readArr(r, s.arr2, version, len),
+            .ARR3 => try readArr(r, s.arr3, version, len),
+            .MXED => try readMixerEditorState(r, s.mixer_editor, version, len),
+            .PARM => try readParams(r, s.params, version, len),
+            .SNAP => try readSnapshots(r, s.snapshots, version, len),
         }
     }
-}
-
-// Use for deprecated fields
-fn skipLoad(r: std.io.AnyReader, len: usize) !void {
-    try r.skipBytes(len, .{});
 }
 
 fn readSnapshots(r: std.io.AnyReader, snapshots: *[256]Snapshot, version: u16, len: u16) !void {
@@ -320,34 +356,45 @@ fn readArr(r: std.io.AnyReader, arr: *[256]u8, version: u16, len: u16) !void {
     }
 }
 
-pub fn save(
-    w: std.io.AnyWriter,
-    params: *const Params,
-    arr1: *const [256]u8,
-    arr2: *const [256]u8,
-    arr3: *const [256]u8,
-    bpat: *const [256]BassPattern,
-    dpat: *const [256]DrumPattern,
-    arranger: *const Arranger,
-    mixer_editor: *const MixerEditor,
-    snapshots: *const [256]Snapshot,
-    snap_map: *const [256]u8,
-) !void {
-    try writeChunk(.ARR1, 1, arr1, w);
-    try writeChunk(.ARR2, 1, arr2, w);
-    try writeChunk(.ARR3, 1, arr3, w);
+pub fn saveWriter(w: std.io.AnyWriter, s: State) !void {
+    var handle = beginChunk(.ARR1, 1);
+    {
+        const hw = handle.w.writer().any();
+        for (0..256) |i| {
+            try hw.writeInt(u8, @atomicLoad(u8, &s.arr1[i], .seq_cst), .little);
+        }
+    }
+    try handle.finalize(w);
 
-    var handle = beginChunk(.BPAT, 1);
+    handle = beginChunk(.ARR2, 1);
+    {
+        const hw = handle.w.writer().any();
+        for (0..256) |i| {
+            try hw.writeInt(u8, @atomicLoad(u8, &s.arr2[i], .seq_cst), .little);
+        }
+    }
+    try handle.finalize(w);
+
+    handle = beginChunk(.ARR3, 1);
+    {
+        const hw = handle.w.writer().any();
+        for (0..256) |i| {
+            try hw.writeInt(u8, @atomicLoad(u8, &s.arr3[i], .seq_cst), .little);
+        }
+    }
+    try handle.finalize(w);
+
+    handle = beginChunk(.BPAT, 1);
     {
         const hw = handle.w.writer().any();
         for (0..255) |i| {
-            const pat = &bpat.*[i];
+            const pat = &s.bpat.*[i];
 
             try hw.writeInt(u8, pat.length(), .little);
             try hw.writeInt(u8, pat.getBase(), .little);
 
             for (0..BassPattern.maxlen) |j| {
-                try hw.writeInt(u8, @bitCast(pat.steps[j]), .little);
+                try hw.writeInt(u8, @bitCast(pat.steps[j].copy()), .little);
             }
         }
     }
@@ -357,12 +404,12 @@ pub fn save(
     {
         const hw = handle.w.writer().any();
         for (0..255) |i| {
-            const pat = &dpat.*[i];
+            const pat = &s.dpat.*[i];
 
             try hw.writeInt(u8, pat.length(), .little);
 
             for (0..DrumPattern.maxlen) |j| {
-                const step_int: u16 = @bitCast(pat.steps[j]);
+                const step_int: u16 = @bitCast(pat.steps[j].copy());
                 try hw.writeInt(u16, step_int, .little);
             }
         }
@@ -370,14 +417,14 @@ pub fn save(
     try handle.finalize(w);
 
     handle = beginChunk(.PARM, 1);
-    try writeParams(handle.w.writer().any(), params);
+    try writeParams(handle.w.writer().any(), s.params);
     try handle.finalize(w);
 
     handle = beginChunk(.ARRS, 1);
     {
         const hw = handle.w.writer().any();
-        try hw.writeInt(u8, arranger.column, .little);
-        try hw.writeInt(u8, arranger.row, .little);
+        try hw.writeInt(u8, s.arranger.column, .little);
+        try hw.writeInt(u8, s.arranger.row, .little);
     }
     try handle.finalize(w);
 
@@ -385,9 +432,9 @@ pub fn save(
     {
         const hw = handle.w.writer().any();
 
-        try hw.writeInt(u8, mixer_editor.selected_channel, .little);
+        try hw.writeInt(u8, s.mixer_editor.selected_channel, .little);
 
-        const row_ch: u8 = switch (mixer_editor.selected_row) {
+        const row_ch: u8 = switch (s.mixer_editor.selected_row) {
             .lvl => 'l',
             .pan => 'p',
             .snd => 's',
@@ -402,9 +449,9 @@ pub fn save(
         const hw = handle.w.writer().any();
 
         for (0..256) |i| {
-            const snap_idx = @atomicLoad(u8, &snap_map[i], .seq_cst);
-            try hw.writeInt(u8, if (snapshots[snap_idx].active()) 1 else 0, .little);
-            try writeParams(hw, &snapshots[snap_idx].params);
+            const snap_idx = @atomicLoad(u8, &s.snap_map[i], .seq_cst);
+            try hw.writeInt(u8, if (s.snapshots[snap_idx].active()) 1 else 0, .little);
+            try writeParams(hw, &s.snapshots[snap_idx].params);
         }
     }
     try handle.finalize(w);

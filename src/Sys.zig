@@ -149,6 +149,15 @@ pub fn startAudio(self: *Self, samples: u16) !void {
     sdl.pauseAudioDevice(device, 0);
 }
 
+pub fn stopAudio(self: *Self) void {
+    if (self.audio_device) |ad| {
+        sdl.closeAudioDevice(ad);
+        self.audio_device = null;
+        midibuf = MidiBuf{ .buf = &midibuf_buf };
+        sound_engine = SoundEngine{ .midibuf = &midibuf };
+    }
+}
+
 pub fn paths(_: *const Self) !Paths {
     const prefpath = sdl.getPrefPath(orgname, appname) orelse return error.FailedGetPrefPath;
     errdefer sdl.free(prefpath);
@@ -175,7 +184,10 @@ pub fn postRender(self: *Self) void {
 }
 
 pub fn cleanup(self: *Self) void {
-    if (self.audio_device) |ad| sdl.closeAudioDevice(ad);
+    if (self.audio_device) |ad| {
+        sdl.closeAudioDevice(ad);
+        self.audio_device = null;
+    }
     sdl.destroyTexture(self.font);
     sdl.destroyTexture(self.out);
 
