@@ -18,6 +18,7 @@ var tmpbuf: [tmp_tpl.len]u8 = undefined;
 var bakbuf: [bak_tpl.len]u8 = undefined;
 
 cursor: u8,
+current: u8,
 
 dir: std.fs.Dir,
 avail: [256]bool = [1]bool{false} ** 256,
@@ -74,9 +75,9 @@ pub fn handle(self: *@This(), input: InputState) !?Request {
     }
 
     if (input.comboPress("start")) return .switch_project;
-    if (input.comboPress("a") and !self.avail[self.cursor]) return .copy_project;
-
-    if (input.comboPress("b") and self.avail[self.cursor]) {
+    if (input.comboPress("a") and !self.avail[self.cursor] and self.current != self.cursor)
+        return .copy_project;
+    if (input.comboPress("b") and self.avail[self.cursor] and self.current != self.cursor) {
         const fname = @This().name(self.cursor);
         const bakname = @This().bakName(self.cursor);
         self.dir.rename(fname, bakname) catch |err| {
@@ -92,11 +93,12 @@ pub fn handle(self: *@This(), input: InputState) !?Request {
 pub fn display(self: *@This(), tm: *TextMatrix, x: usize, y: usize, dt: f32, c: *const Theme) void {
     const on = @mod(self.blink * 4, 1) < 0.5;
 
-    const cursor_attr = if (on) c.normal.invert() else c.normal;
     for (0..16) |iy| {
         for (0..16) |ix| {
             const idx: u8 = @intCast(ix | (iy << 4));
-            const attr = if (idx == self.cursor) cursor_attr else c.normal;
+            const color = if (idx == self.current) c.hilight else c.normal;
+            const cursor_attr = if (on) color.invert() else color;
+            const attr = if (idx == self.cursor) cursor_attr else color;
 
             if (self.avail[idx])
                 tm.puts(x + ix, y + iy, attr, "\xfe")
@@ -104,6 +106,7 @@ pub fn display(self: *@This(), tm: *TextMatrix, x: usize, y: usize, dt: f32, c: 
                 tm.puts(x + ix, y + iy, attr, "\xfa");
         }
     }
+    tm.print(x, y + 16, c.hilight, "project: {x:0>2}", .{self.cursor});
 
     self.blink = @mod(self.blink + dt, 1);
 }

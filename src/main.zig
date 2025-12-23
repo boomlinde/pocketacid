@@ -113,7 +113,11 @@ pub fn main() !void {
     var known_fullscreen = false;
     var clipboard = Clipboard{};
     while (true) {
-        var pp = ProjectPicker{ .dir = savedir, .cursor = config.project };
+        var pp = ProjectPicker{
+            .dir = savedir,
+            .cursor = config.project,
+            .current = config.project,
+        };
         switch (try sequencer(
             &sys,
             savedir,
@@ -340,7 +344,7 @@ pub fn sequencer(
                     pp.cursor = config.project;
                 },
             };
-            pp.display(&tm, 1, 1, dt, colors);
+            pp.display(&tm, 7, 3, dt, colors);
             continue :mainloop;
         }
 
@@ -390,6 +394,7 @@ pub fn sequencer(
         if (trig.comboPress("start")) Sys.sound_engine.startstop(arranger.row);
         if (Sys.sound_engine.isRunning()) tm.putch(0, 0, colors.playing, 0x10);
         tm.print(1, 0, colors.normal, "{}", .{params.engine.get(.bpm)});
+        tm.print(5, 0, colors.faded(0.5).hilight, "({x:0>2})", .{config.project});
         params.engine.mutes.display(colors, &tm, 22, 0);
 
         const pi: []const PlaybackInfo = &[_]PlaybackInfo{
