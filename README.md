@@ -5,8 +5,8 @@ controllers and cheap, handheld Linux-based game consoles like the [R36S](https:
 It's designed for live use, with quick access to synthesizer parameters via
 joysticks, muting using button combinations and pattern queuing.
 
-The patterns, arrangement and parameters and so on are all contained in a
-single file, which is automatically saved upon exit.
+The patterns, arrangement and parameters and so on are all contained in
+one of up to 256 project files, which is automatically saved upon exit.
 
 ![Picture of R36XX running Pocket Acid](.readme-assets/r36xx_small.jpg)
 
@@ -33,6 +33,14 @@ Then you can simply run:
     prereqs/zig/zig build -Doptimize=ReleaseFast
 
 after which the executable will be available at `zig-out/bin/pocketacid`.
+
+If you have problems launching the portmaster release of Pocket Acid from a
+Unix filesystem, make sure `that ports/pocketacid/pocketacid` is marked as
+executable. A few people experienced this problem after extracting the files
+to a Windows filesystem (which doesn't preserve the executable flag) and then
+copying the files to a device which used a Unix filesystem. This is not a
+problem in ArkOS: it uses a FAT filesystem and all files are implicitly
+executable.
 
 # Bassline synthesizer
 
@@ -119,7 +127,8 @@ The buttons are also mapped to the computer keyboard buttons:
 Since there are no joysticks on the keyboard, these don't represent
 a full set of controls, but can for example be used while sequencing.
 
-Some controls apply globally across the program:
+Some controls apply globally across the program (except in the project
+picker):
 
 | Button(s)    | Effect                                              |
 | ------------ | --------------------------------------------------- |
@@ -141,6 +150,7 @@ Some controls apply globally across the program:
 | L2           | Momentarily control bassline resonance and feedback |
 | R2           | Momentarily control bassline decay and accent       |
 | start+select | Exit Pocket Acid                                    |
+| L2+R2+start  | Enter project picker                                |
 
 Others are specific to the different sections of the programs described below
 
@@ -176,6 +186,7 @@ depending on whether you are holding L2, R2 or both.
 Pocket Acid is divided into several sections which you can normally move
 between using the select and R1 buttons:
 
+* **Project picker**: used to manage projects
 * **Arranger**: used for arranging patterns into loops or songs
 * **Bassline pattern sequencer**: used to compose bassline patterns
 * **Drum machine pattern sequencer**: used to compose drum machine patterns
@@ -187,6 +198,47 @@ The sections are described in greater detail below.
 
 Regardless of which section you're in, the current tempo, playback status
 and mute state will be displayed at the top of the screen area.
+
+### Project picker
+
+A project is essentially a savefile, containing the arrangement, patterns,
+snapshots and musical settings that you edit in every other mode.  With the
+project picker you can switch, delete and clone projects.
+
+Pocket Acid can manage up to 256 project. In the project picker, these are
+arranged in a grid of cells either displaying a dot (for a currently unsaved
+slot) or a block (for an existing project). The currently selected  project
+is highlighted.
+
+| Button(s)   | Effect                                                   |
+| ----------- | -------------------------------------------------------- |
+| up          | Navigate to previous row                                 |
+| down        | Navigate to next row                                     |
+| left        | Navigate to previous column                              |
+| right       | Navigate to next column                                  |
+| start       | Save current project and switch to project under cursor  |
+| A           | Write current project to cell under cursor               |
+| B           | Remove project under cursor                              |
+| L2+R2+start | Exit project picker                                      |
+
+* The currently active project can't be removed/overwritten in the project
+  picker. Pressing `a` also can't overwrite *any* saved projects; the
+  project occupying the slot you want to use has to be removed first.
+* The currently selected project index will be saved in the configuration,
+  and Pocket Acid will always load that when starting up.
+* Switching to the project that's already active is a no-op.
+* The currently active project may still appear as a dot if it hasn't been
+  saved. It's saved only when you switch to another project or exit Pocket
+  Acid.
+* Removing a project removes it from the grid, but leaves it backed up in
+  the file system. If you accidentally remove e.g. project 3f, you can
+  restore it by exiting Pocket Acid and renaming "project3f.sav.bak"
+  to "project3f.sav".
+* Each project is ~32k in size. In the absolute worst case (256 projects and
+  256 backups), Pocket Acid will use ~16M of disk space for the projects.
+* If you have an old workspace save file (named "state.sav"), it will be
+  migrated and saved as project 00. The migration process may fail if you
+  already have a file called "project00.sav" in the save directory.
 
 ### Arranger
 
@@ -482,7 +534,7 @@ Controls:
 
 If a savedir is not supplied, a default location appropriate for the OS
 will be used (via [`SDL_GetPrefPath`](https://wiki.libsdl.org/SDL2/SDL_GetPrefPath)).
-This is where the configuration and workspace will be saved.
+This is where the configuration and project files will be saved.
 
 ## Acknowledgement
 
