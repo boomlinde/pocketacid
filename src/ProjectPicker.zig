@@ -70,7 +70,9 @@ pub fn handle(self: *@This(), input: InputState) !?Request {
     if (input.repeat.up and self.cursor & 0xf0 != 0) self.cursor -= 0x10;
     if (input.repeat.down and self.cursor & 0xf0 != 0xf0) self.cursor += 0x10;
 
-    if (input.hold.l2 and input.hold.r2 and input.press.start) {
+    if ((input.hold.l2 and input.hold.r2 and input.press.start) or
+        (input.hold.l2 and input.hold.r and input.press.start))
+    {
         return .close_picker;
     }
 

@@ -151,8 +151,12 @@ picker):
 | R2           | Momentarily control bassline decay and accent       |
 | start+select | Exit Pocket Acid                                    |
 | L2+R2+start  | Enter project picker                                |
+| L2+R1+start  | Enter project picker (alternative, see note below)  |
 
-Others are specific to the different sections of the programs described below
+Others are specific to the different sections of the programs described below.
+
+MustardOS globally binds L2+R2+start to reset the console, so an alternative
+button combination is provided.
 
 ### Joyless mode
 
@@ -220,6 +224,7 @@ is highlighted.
 | A           | Write current project to cell under cursor               |
 | B           | Remove project under cursor                              |
 | L2+R2+start | Exit project picker                                      |
+| L2+R1+start | Exit project picker (alternative)                        |
 
 * The currently active project can't be removed/overwritten in the project
   picker. Pressing `a` also can't overwrite *any* saved projects; the

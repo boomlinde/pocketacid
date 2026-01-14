@@ -348,7 +348,9 @@ pub fn sequencer(
             continue :mainloop;
         }
 
-        if (trig.hold.l2 and trig.hold.r2 and trig.press.start and !pick_project) {
+        if ((trig.hold.l2 and trig.hold.r2 and trig.press.start and !pick_project) or
+            (trig.hold.l2 and trig.hold.r and trig.press.start and !pick_project))
+        {
             try pp.updateAvail();
             pick_project = true;
         }
