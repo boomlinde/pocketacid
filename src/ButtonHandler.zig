@@ -109,10 +109,18 @@ pub const ButtonState = packed struct {
             sdl.KEYDOWN => if (!nokeyboard) {
                 if (e.key.repeat != 0) return false;
                 switch (e.key.keysym.scancode) {
-                    sdl.SCANCODE_UP => self.up = true,
-                    sdl.SCANCODE_DOWN => self.down = true,
-                    sdl.SCANCODE_LEFT => self.left = true,
-                    sdl.SCANCODE_RIGHT => self.right = true,
+                    sdl.SCANCODE_UP => if (!self.left and !self.right) {
+                        self.up = true;
+                    },
+                    sdl.SCANCODE_DOWN => if (!self.left and !self.right) {
+                        self.down = true;
+                    },
+                    sdl.SCANCODE_LEFT => if (!self.up and !self.down) {
+                        self.left = true;
+                    },
+                    sdl.SCANCODE_RIGHT => if (!self.up and !self.down) {
+                        self.right = true;
+                    },
                     sdl.SCANCODE_Z => self.a = true,
                     sdl.SCANCODE_X => self.b = true,
                     sdl.SCANCODE_A => self.x = true,
@@ -164,10 +172,18 @@ pub const ButtonState = packed struct {
                 else => return false,
             },
             sdl.CONTROLLERBUTTONDOWN => switch (e.cbutton.button) {
-                sdl.CONTROLLER_BUTTON_DPAD_UP => self.up = true,
-                sdl.CONTROLLER_BUTTON_DPAD_DOWN => self.down = true,
-                sdl.CONTROLLER_BUTTON_DPAD_LEFT => self.left = true,
-                sdl.CONTROLLER_BUTTON_DPAD_RIGHT => self.right = true,
+                sdl.CONTROLLER_BUTTON_DPAD_UP => if (!self.left and !self.right) {
+                    self.up = true;
+                },
+                sdl.CONTROLLER_BUTTON_DPAD_DOWN => if (!self.left and !self.right) {
+                    self.down = true;
+                },
+                sdl.CONTROLLER_BUTTON_DPAD_LEFT => if (!self.up and !self.down) {
+                    self.left = true;
+                },
+                sdl.CONTROLLER_BUTTON_DPAD_RIGHT => if (!self.up and !self.down) {
+                    self.right = true;
+                },
                 sdl.CONTROLLER_BUTTON_A => self.a = true,
                 sdl.CONTROLLER_BUTTON_B => self.b = true,
                 sdl.CONTROLLER_BUTTON_X => self.x = true,
