@@ -223,6 +223,7 @@ is highlighted.
 | start       | Save current project and switch to project under cursor  |
 | A           | Write current project to cell under cursor               |
 | B           | Remove project under cursor                              |
+| Y+down      | Reload currently active project                          |
 | L2+R2+start | Exit project picker                                      |
 | L2+R1+start | Exit project picker (alternative)                        |
 
@@ -231,10 +232,10 @@ is highlighted.
   project occupying the slot you want to use has to be removed first.
 * The currently selected project index will be saved in the configuration,
   and Pocket Acid will always load that when starting up.
-* Switching to the project that's already active is a no-op.
 * The currently active project may still appear as a dot if it hasn't been
-  saved. It's saved only when you switch to another project or exit Pocket
-  Acid.
+  saved.
+* Switching to the currently selected project will effectively just save
+  it.
 * Removing a project removes it from the grid, but leaves it backed up in
   the file system. If you accidentally remove e.g. project 3f, you can
   restore it by exiting Pocket Acid and renaming "project3f.sav.bak"
@@ -244,6 +245,9 @@ is highlighted.
 * If you have an old workspace save file (named "state.sav"), it will be
   migrated and saved as project 00. The migration process may fail if you
   already have a file called "project00.sav" in the save directory.
+* The current project is automatically saved on exit.
+* Reloading the currently active project will restore the last saved state
+  of the active project and return to the project picker.
 
 ### Arranger
 

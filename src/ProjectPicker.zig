@@ -24,7 +24,7 @@ dir: std.fs.Dir,
 avail: [256]bool = [1]bool{false} ** 256,
 blink: f32 = 0,
 
-pub const Request = enum { switch_project, copy_project, close_picker };
+pub const Request = enum { switch_project, copy_project, close_picker, reload };
 
 pub fn migrate(dir: std.fs.Dir) !void {
     // Return if there is no state.sav
@@ -65,6 +65,8 @@ pub fn updateAvail(self: *@This()) !void {
 
 pub fn handle(self: *@This(), input: InputState) !?Request {
     if (input.hold.any()) self.blink = 0;
+
+    if (input.hold.y and input.press.down) return .reload;
     if (input.repeat.left and self.cursor & 0xf != 0) self.cursor -= 1;
     if (input.repeat.right and self.cursor & 0xf != 0xf) self.cursor += 1;
     if (input.repeat.up and self.cursor & 0xf0 != 0) self.cursor -= 0x10;

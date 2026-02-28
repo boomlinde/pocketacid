@@ -317,18 +317,22 @@ pub fn sequencer(
         if (pick_project) {
             if (try pp.handle(trig)) |req| switch (req) {
                 .switch_project => {
+                    save.save(
+                        savedir,
+                        ProjectPicker.name(config.project),
+                        ProjectPicker.tmpName(config.project),
+                        save_state,
+                    );
                     if (config.project != pp.cursor) {
-                        save.save(
-                            savedir,
-                            ProjectPicker.name(config.project),
-                            ProjectPicker.tmpName(config.project),
-                            save_state,
-                        );
                         config.project = pp.cursor;
                         skipsave = true;
                         return .reload;
                     }
                     pick_project = false;
+                },
+                .reload => {
+                    skipsave = true;
+                    return .reload;
                 },
                 .copy_project => {
                     save.save(
