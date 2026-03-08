@@ -375,8 +375,8 @@ Controls:
 | A           | Toggle modifier/gate and advance cursor             |
 | A+up        | Increment pitch (while on pitch section)            |
 | A+down      | Decrement pitch (while on pitch section)            |
-| X+up        | Transpose notes to the left up                      |
-| X+down      | Transpose notes to the left down                    |
+| X+up        | Transpose notes to the right up                     |
+| X+down      | Transpose notes to the right down                   |
 | X+left      | Shift pattern to the left                           |
 | X+right     | Shift pattern to the right                          |
 | B           | Remove modifier/gate and advance cursor             |
