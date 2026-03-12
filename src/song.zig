@@ -35,15 +35,12 @@ pub fn init() void {
     bass1_arrange = [1]u8{0xff} ** 256;
     bass2_arrange = [1]u8{0xff} ** 256;
     drum_arrange = [1]u8{0xff} ** 256;
+
+    for (0..256) |i| snap_map[i] = @intCast(i);
 }
 
 // The snap map isn't saved
-pub var snap_map: [256]u8 = snap_map_fill: {
-    var ret: [256]u8 = undefined;
-
-    for (0..256) |i| ret[i] = @intCast(i);
-    break :snap_map_fill ret;
-};
+pub var snap_map: [256]u8 = undefined;
 
 pub fn findEmptyUnusedBassPattern() ?u8 {
     // Index all used patterns
