@@ -248,6 +248,7 @@ fn bareReadParams(r: std.io.AnyReader, params: *Params, version: u16) !void {
 }
 
 fn readBassPatch1(r: std.io.AnyReader, params: *DigiBass.Params) !void {
+    params.set(.sound_type, .pd);
     params.set(.timbre, try readFloat01(r));
     params.set(.mod_depth, try readFloat01(r));
     params.set(.res, try readFloat01(r));
