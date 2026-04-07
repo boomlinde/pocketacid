@@ -37,6 +37,7 @@ pub const Id = enum(u7) {
     R7,
     R8,
     R9,
+    N1,
 
     pub fn resolve(self: Id) *const Kit {
         return switch (self) {
@@ -44,6 +45,7 @@ pub const Id = enum(u7) {
             .R7 => &R7,
             .R8 => &R8,
             .R9 => &R9,
+            .N1 => &N1,
         };
     }
 
@@ -107,4 +109,18 @@ pub const R7 = Kit{
     .xx = @embedFile("assets/samples/rs707.raw"),
     .yy = @embedFile("assets/samples/cp707.raw"),
     .choh = oh707,
+};
+
+const n1_oh = @embedFile("assets/samples/ns_oh.raw");
+pub const N1 = Kit{
+    .bd = @embedFile("assets/samples/ns_bd.raw"),
+    .ch = @embedFile("assets/samples/ns_ch.raw"),
+    .oh = n1_oh,
+    .cy = @embedFile("assets/samples/ns_cy.raw"),
+    .ht = @embedFile("assets/samples/ns_ht.raw"),
+    .lt = @embedFile("assets/samples/ns_lt.raw"),
+    .sd = @embedFile("assets/samples/ns_sd.raw"),
+    .xx = @embedFile("assets/samples/ns_xx.raw"),
+    .yy = @embedFile("assets/samples/ns_yy.raw"),
+    .choh = n1_oh,
 };
