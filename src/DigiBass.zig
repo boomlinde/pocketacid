@@ -1,4 +1,4 @@
-// Copyright (C) 2025  Philip Linde
+// Copyright (C) 2025-2026  Philip Linde
 //
 // This file is part of Pocket Acid.
 //
@@ -20,13 +20,17 @@ const midi = @import("midi.zig");
 const std = @import("std");
 const MonoLegato = @import("MonoLegato.zig");
 const MonoVoiceManager = @import("MonoVoiceManager.zig");
-const PDBass = @This();
+const DigiBass = @This();
 const Smoother = @import("Smoother.zig");
 const ADEnv = @import("ADEnv.zig");
 
 const Accessor = @import("Accessor.zig").Accessor;
 
 pub const Params = struct {
+    pub const Type = enum(u8) { pd, fm };
+
+    sound_type: Type = .pd,
+
     timbre: f32 = 0.5 - 0.125,
     mod_depth: f32 = 0.5,
 
@@ -57,6 +61,7 @@ prev: f32 = 0,
 prev_res: f32 = 0,
 mod_env: ADEnv = .{},
 prev_gate: bool = false,
+current_mul: f32 = 1,
 
 bend_smooth: Smoother = .{},
 
@@ -66,7 +71,7 @@ timbre_smooth: Smoother = .{},
 feedback_smooth: Smoother = .{},
 mod_smooth: Smoother = .{},
 
-pub fn short(self: *PDBass) void {
+pub fn short(self: *DigiBass) void {
     self.accentness_smooth.short(self.params.get(.accentness));
     self.timbre_smooth.short(self.params.get(.timbre));
     self.res_smooth.short(self.params.get(.res));
@@ -74,7 +79,89 @@ pub fn short(self: *PDBass) void {
     self.feedback_smooth.short(self.params.get(.feedback));
 }
 
-pub inline fn next(self: *PDBass, srate: f32) f32 {
+pub inline fn next(self: *DigiBass, srate: f32) f32 {
+    return switch (self.params.get(.sound_type)) {
+        .fm => self.nextFM(srate),
+        .pd => self.nextPD(srate),
+    };
+}
+
+pub inline fn nextFM(self: *DigiBass, srate: f32) f32 {
+    const accentness_raw = self.accentness_smooth.next(self.params.get(.accentness), param_smooth_time, srate);
+    const bend = self.bend_smooth.next(self.bend, bend_smooth_time, srate);
+    const timbre = self.timbre_smooth.next(self.params.get(.timbre), param_smooth_time, srate);
+    const res = self.res_smooth.next(self.params.get(.res), param_smooth_time, srate);
+    const mod = self.mod_smooth.next(self.params.get(.mod_depth), param_smooth_time, srate);
+    const feedback = self.feedback_smooth.next(self.params.get(.feedback), param_smooth_time, srate);
+    const state = self.legato.next(self.man.state, srate);
+
+    if (self.man.state.gate and !self.prev_gate) {
+        self.mod_env.trigger();
+        if (self.amp_env.current == 0) self.phase = 0;
+    }
+    self.prev_gate = self.man.state.gate;
+
+    const accentness = if (state.velocity >= 96) accentness_raw else 0;
+    const mp: ADEnv.Params = if (accentness > 0)
+        .{
+            .attack = 0.05,
+            .decay = 0.2,
+            .attack_shape = 0,
+            .decay_shape = 0,
+        }
+    else
+        .{
+            .attack = 0,
+            .decay = self.params.get(.decay),
+            .attack_shape = 0.5,
+            .decay_shape = 0.5,
+        };
+    const mod_env = self.mod_env.next(&mp, srate);
+
+    const fb = self.prev * feedback * 0.5;
+
+    const pitch = state.pitch + bend;
+
+    const amod = lerp(mod, 1, accentness);
+    const nt = normal(timbre);
+    const total_mod = lerp(nt * nt, 1, lerp(0, accentness * 4, nt * nt)) * lerp(1, mod_env, amod);
+
+    const rp = res * res * res;
+    const phase_mul = self.phase * (1 + 16 * rp);
+
+    const freq = 440.0 * std.math.pow(f32, 2.0, (pitch - 69) / 12);
+    defer {
+        self.phase += freq / srate;
+        if (self.phase >= 1) {
+            self.phase -= 1;
+            self.current_mul = 1 + @round(res * res * 12);
+        }
+    }
+
+    const amp_env_params: ADREnv.Params = .{
+        .attack = 0.0001,
+        .decay = 3,
+        .release = 0.03,
+    };
+
+    const amp = self.amp_env.next(&amp_env_params, state.gate, srate);
+
+    const falloff = if (timbre < 0.5)
+        1 - self.phase * self.phase * self.phase
+    else
+        1;
+
+    const mod_wave = if (timbre < 0.5)
+        @sin(self.phase * phase_mul * std.math.tau)
+    else
+        @sin(self.phase * self.current_mul * std.math.tau);
+
+    const mod_total = mod_wave * 8 * total_mod * falloff + fb;
+    self.prev = clamp(@sin(std.math.tau * (self.phase + mod_total))) * amp;
+    return self.prev;
+}
+
+pub inline fn nextPD(self: *DigiBass, srate: f32) f32 {
     const accentness_raw = self.accentness_smooth.next(self.params.get(.accentness), param_smooth_time, srate);
     const bend = self.bend_smooth.next(self.bend, bend_smooth_time, srate);
     const timbre = self.timbre_smooth.next(self.params.get(.timbre), param_smooth_time, srate);
@@ -157,7 +244,7 @@ pub inline fn falloffFunc(phase: f32, factor: f32) f32 {
     // return 1 - phase;
 }
 
-pub fn handleMidiEvent(self: *PDBass, event: midi.Event) void {
+pub fn handleMidiEvent(self: *DigiBass, event: midi.Event) void {
     if ((event.channel() orelse return) != self.channel) return;
     switch (event) {
         .note_on => |e| self.man.noteOn(e.pitch, e.velocity),

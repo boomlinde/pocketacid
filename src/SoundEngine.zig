@@ -1,4 +1,4 @@
-// Copyright (C) 2025  Philip Linde
+// Copyright (C) 2025-2026  Philip Linde
 //
 // This file is part of Pocket Acid.
 //
@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Pocket Acid.  If not, see <https://www.gnu.org/licenses/>.
 
-const PDBass = @import("PDBass.zig");
+const DigiBass = @import("DigiBass.zig");
 const BassSeq = @import("BassSeq.zig");
 const DrumSeq = @import("DrumSeq.zig");
 const MidiBuf = @import("MidiBuf.zig");
@@ -75,8 +75,8 @@ ds: DrumSeq = .{
     .channel = 2,
 },
 
-pdbass1: PDBass = .{ .channel = 0, .params = undefined },
-pdbass2: PDBass = .{ .channel = 1, .params = undefined },
+pdbass1: DigiBass = .{ .channel = 0, .params = undefined },
+pdbass2: DigiBass = .{ .channel = 1, .params = undefined },
 drums: DrumMachine = .{ .channel = 2, .params = undefined, .mutes = undefined },
 
 delay: StereoFeedbackDelay = .{

@@ -44,12 +44,16 @@ executable.
 
 # Bassline synthesizer
 
-The bassline synthesizer architecture is built on phase distortion, but is
-designed to roughly emulate the sound and control of a classic, subtractive
-bassline synthesizer. Unlike a typical phase distortion synthesizer, it
-employs feedback phase modulation to optionally produce a harsher, distorted
-tone. Unlike a classic bassline synthesizer, controlling the waveform and
-"filter cutoff" are unified into a single control, called "timbre".
+The bassline synthesizer architecture has two modes:
+
+## Phase distortion
+
+One mode is based on phase distortion, but is designed to roughly emulate
+the sound and control of a classic, subtractive bassline synthesizer. Unlike
+a typical phase distortion synthesizer, it employs feedback phase modulation
+to optionally produce a harsher, distorted tone. Unlike a classic bassline
+synthesizer, controlling the waveform and "filter cutoff" are unified into a
+single control, called "timbre".
 
 Parameters:
 
@@ -73,6 +77,21 @@ Parameters:
 * **decay**: controls the decay time of the timbre envelope.
 * **accent**: controls the level of influence an accent in the
   sequencer will have on the timbre
+
+## FM
+
+The other mode is based on FM. Its controls are exactly the same as for the
+phase distortion mode, but they map to slightly different settings internally.
+
+The descriptions for the phase distortion mode still apply except the following:
+
+* **timbre**: controls the timbre of the synth. The closer to the center it
+  is, the less overtones the sound will have. Above the center, the resonance
+  parameter controls the integer modulator ratio. Below the center, the ratio
+  is not integer, but a window function is applied so as to avoid sharp
+  transitions.
+* **res**: controls the modulator ratio of the synth. The exact application of
+  the paramater depends on whether the timbre setting is above or below center.
 
 The parameter settings are visible at the bottom of the arranger/pattern
 sequencer page. Which parameters are shown (and edited by the joysticks)
@@ -480,8 +499,8 @@ Controls:
 
 ### Settings
 
-    drive:      00
-    accent:     00
+    drive:      00 bass1: pd
+    accent:     00 bass2: pd
     duck time:  40
     delay time: 40
     delay fb:   80
@@ -506,6 +525,7 @@ These musical settings are included in snapshots:
 * swing: controls the time ratio between odd and even steps, allowing for
   16th note swing
 * drum kit: the built-in drum kit sample set to use
+* bass1 and bass2: the synthesis mode of the bassline synthesizers
 
 These settings concern the whole program and are not included in snapshots:
 

@@ -1,4 +1,4 @@
-// Copyright (C) 2025  Philip Linde
+// Copyright (C) 2025-2026  Philip Linde
 //
 // This file is part of Pocket Acid.
 //
@@ -17,6 +17,7 @@
 
 const std = @import("std");
 
+const DigiBass = @import("DigiBass.zig");
 const TextMatrix = @import("TextMatrix.zig");
 const InputState = @import("ButtonHandler.zig").States;
 const StereoFeedbackDelay = @import("StereoFeedbackDelay.zig");
@@ -31,6 +32,7 @@ pub const Entry = union(enum) {
     Kit: EnumEntry(Kit.Id),
     Theme: EnumEntry(Theme.Id),
     FontType: EnumEntry(FontType),
+    BassType: EnumEntry(DigiBass.Params.Type),
     spacer,
 
     fn up(self: Entry) void {

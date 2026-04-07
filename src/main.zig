@@ -1,4 +1,4 @@
-// Copyright (C) 2025  Philip Linde
+// Copyright (C) 2025-2026  Philip Linde
 //
 // This file is part of Pocket Acid.
 //
@@ -30,7 +30,7 @@ const BassPattern = @import("BassPattern.zig");
 const Arranger = @import("Arranger.zig");
 const JoystickHandler = @import("JoystickHandler.zig");
 const PlaybackInfo = @import("PlaybackInfo.zig").PlaybackInfo;
-const PDBass = @import("PDBass.zig");
+const DigiBass = @import("DigiBass.zig");
 const JoyMode = @import("JoyMode.zig").JoyMode;
 const save = @import("save.zig");
 const MixerEditor = @import("MixerEditor.zig");
@@ -193,8 +193,8 @@ pub fn sequencer(
     var master_editor = MasterEditor{
         .left = &left_menu,
         .right = &.{
-            .spacer,
-            .spacer,
+            .{ .BassType = .{ .label = "bass1:", .ptr = &params.bass1.sound_type } },
+            .{ .BassType = .{ .label = "bass2:", .ptr = &params.bass2.sound_type } },
             .spacer,
             .spacer,
             .spacer,
@@ -486,7 +486,7 @@ pub fn sequencer(
     return .exit;
 }
 
-fn joylessHandleParams(trig: ButtonHandler.States, mode: JoyMode, params: *PDBass.Params) void {
+fn joylessHandleParams(trig: ButtonHandler.States, mode: JoyMode, params: *DigiBass.Params) void {
     const single_step: f32 = @as(f32, 1) / 0xff;
 
     const step = single_step * @as(f32, if (trig.hold.a) 8 else 1);
@@ -532,7 +532,7 @@ fn joylessHandleParams(trig: ButtonHandler.States, mode: JoyMode, params: *PDBas
     }
 }
 
-fn handleParams(ux: f32, uy: f32, dt: f32, mode: JoyMode, params: *PDBass.Params) void {
+fn handleParams(ux: f32, uy: f32, dt: f32, mode: JoyMode, params: *DigiBass.Params) void {
     const joy_sensitivity = 0.5;
     const x = ux * joy_sensitivity * dt;
     const y = uy * joy_sensitivity * dt;

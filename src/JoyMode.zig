@@ -1,4 +1,4 @@
-// Copyright (C) 2025  Philip Linde
+// Copyright (C) 2025-2026  Philip Linde
 //
 // This file is part of Pocket Acid.
 //
@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Pocket Acid.  If not, see <https://www.gnu.org/licenses/>.
 
-const PDBass = @import("PDBass.zig");
+const DigiBass = @import("DigiBass.zig");
 const std = @import("std");
 
 pub const JoyMode = enum {
@@ -62,7 +62,7 @@ pub const JoyMode = enum {
         };
     }
 
-    pub fn values(self: JoyMode, params: *const PDBass.Params) Pair {
+    pub fn values(self: JoyMode, params: *const DigiBass.Params) Pair {
         const FloatPair = struct { x: f32, y: f32 };
         const v: FloatPair = switch (self) {
             .timbre_mod => .{

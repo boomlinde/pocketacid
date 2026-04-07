@@ -1,4 +1,4 @@
-// Copyright (C) 2025  Philip Linde
+// Copyright (C) 2025-2026  Philip Linde
 //
 // This file is part of Pocket Acid.
 //
@@ -18,7 +18,7 @@
 const std = @import("std");
 
 const DrumPattern = @import("DrumPattern.zig");
-const PDBass = @import("PDBass.zig");
+const DigiBass = @import("DigiBass.zig");
 const DrumMachine = @import("DrumMachine.zig");
 const BassPattern = @import("BassPattern.zig");
 const Arranger = @import("Arranger.zig");
@@ -174,7 +174,16 @@ fn readSnapshots(r: std.io.AnyReader, snapshots: *[256]Snapshot, version: u16, l
 
             for (0..256) |i| {
                 const enabled = 0 != (try r.readInt(u8, .little));
-                try bareReadParams(r, &snapshots[i].params);
+                try bareReadParams(r, &snapshots[i].params, 1);
+                @atomicStore(bool, &snapshots[i].enabled, enabled, .seq_cst);
+            }
+        },
+        2 => {
+            if (len != 75 * 256) return error.SnapshotsBadLength;
+
+            for (0..256) |i| {
+                const enabled = 0 != (try r.readInt(u8, .little));
+                try bareReadParams(r, &snapshots[i].params, 2);
                 @atomicStore(bool, &snapshots[i].enabled, enabled, .seq_cst);
             }
         },
@@ -186,22 +195,35 @@ fn readParams(r: std.io.AnyReader, params: *Params, version: u16, len: u16) !voi
     switch (version) {
         1 => {
             if (len != 72) return error.BadParamLen;
-            try bareReadParams(r, params);
+            try bareReadParams(r, params, 1);
+        },
+        2 => {
+            if (len != 74) return error.BadParamLen;
+            try bareReadParams(r, params, 2);
         },
         else => return error.BadParamVersion,
     }
 }
 
-fn bareReadParams(r: std.io.AnyReader, params: *Params) !void {
+fn bareReadParams(r: std.io.AnyReader, params: *Params, version: u16) !void {
     // Engine (4)
     params.engine.set(.bpm, try r.readInt(i16, .little));
     params.engine.set(.drive, try r.readInt(u8, .little));
     params.engine.set(.mutes, @bitCast(try r.readInt(u8, .little)));
     params.engine.set(.swing, try r.readInt(u8, .little));
 
-    // Bass synths (28)
-    try readBassPatch(r, &params.bass1);
-    try readBassPatch(r, &params.bass2);
+    // Bass synths (28 +2 version2)
+    switch (version) {
+        1 => {
+            try readBassPatch1(r, &params.bass1);
+            try readBassPatch1(r, &params.bass2);
+        },
+        2 => {
+            try readBassPatch2(r, &params.bass1);
+            try readBassPatch2(r, &params.bass2);
+        },
+        else => return error.UnsupportedVersion,
+    }
 
     // Drums (33)
     params.drums.set(.accent, try r.readInt(u8, .little));
@@ -225,7 +247,17 @@ fn bareReadParams(r: std.io.AnyReader, params: *Params) !void {
     }
 }
 
-fn readBassPatch(r: std.io.AnyReader, params: *PDBass.Params) !void {
+fn readBassPatch1(r: std.io.AnyReader, params: *DigiBass.Params) !void {
+    params.set(.timbre, try readFloat01(r));
+    params.set(.mod_depth, try readFloat01(r));
+    params.set(.res, try readFloat01(r));
+    params.set(.feedback, try readFloat01(r));
+    params.set(.decay, try readFloat01(r));
+    params.set(.accentness, try readFloat01(r));
+}
+
+fn readBassPatch2(r: std.io.AnyReader, params: *DigiBass.Params) !void {
+    params.set(.sound_type, @enumFromInt(try r.readInt(u8, .little)));
     params.set(.timbre, try readFloat01(r));
     params.set(.mod_depth, try readFloat01(r));
     params.set(.res, try readFloat01(r));
@@ -416,7 +448,7 @@ pub fn saveWriter(w: std.io.AnyWriter, s: State) !void {
     }
     try handle.finalize(w);
 
-    handle = beginChunk(.PARM, 1);
+    handle = beginChunk(.PARM, 2);
     try writeParams(handle.w.writer().any(), s.params);
     try handle.finalize(w);
 
@@ -444,7 +476,7 @@ pub fn saveWriter(w: std.io.AnyWriter, s: State) !void {
     }
     try handle.finalize(w);
 
-    handle = beginChunk(.SNAP, 1);
+    handle = beginChunk(.SNAP, 2);
     {
         const hw = handle.w.writer().any();
 
@@ -487,7 +519,8 @@ fn writeParams(w: std.io.AnyWriter, params: *const Params) !void {
     }
 }
 
-fn writeBassParams(w: std.io.AnyWriter, params: *const PDBass.Params) !void {
+fn writeBassParams(w: std.io.AnyWriter, params: *const DigiBass.Params) !void {
+    try w.writeInt(u8, @intFromEnum(params.get(.sound_type)), .little);
     try writeParam01(w, params.get(.timbre));
     try writeParam01(w, params.get(.mod_depth));
     try writeParam01(w, params.get(.res));

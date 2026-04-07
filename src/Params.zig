@@ -1,4 +1,4 @@
-// Copyright (C) 2025  Philip Linde
+// Copyright (C) 2025-2026  Philip Linde
 //
 // This file is part of Pocket Acid.
 //
@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Pocket Acid.  If not, see <https://www.gnu.org/licenses/>.
 
-const PDBass = @import("PDBass.zig");
+const DigiBass = @import("DigiBass.zig");
 const DrumMachine = @import("DrumMachine.zig");
 const SoundEngine = @import("SoundEngine.zig");
 const StereoFeedbackDelay = @import("StereoFeedbackDelay.zig");
@@ -23,8 +23,8 @@ const Mixer = @import("Mixer.zig");
 const Accessor = @import("Accessor.zig").Accessor;
 
 engine: SoundEngine.Params = .{},
-bass1: PDBass.Params = .{},
-bass2: PDBass.Params = .{},
+bass1: DigiBass.Params = .{},
+bass2: DigiBass.Params = .{},
 drums: DrumMachine.Params = .{},
 delay: StereoFeedbackDelay.Params = .{},
 mixer: [Mixer.nchannels]Mixer.Channel.Params = [1]Mixer.Channel.Params{.{}} ** Mixer.nchannels,

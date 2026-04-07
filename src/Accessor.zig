@@ -1,4 +1,4 @@
-// Copyright (C) 2025  Philip Linde
+// Copyright (C) 2025-2026  Philip Linde
 //
 // This file is part of Pocket Acid.
 //
@@ -149,6 +149,7 @@ test Accessor {
 }
 
 pub fn FieldEnum(comptime Struct: type) type {
+    @setEvalBranchQuota(10_000);
     const struct_fields = std.meta.fields(Struct);
     var enum_fields: [struct_fields.len]std.builtin.Type.EnumField = undefined;
     for (struct_fields, 0..) |field, i| {
