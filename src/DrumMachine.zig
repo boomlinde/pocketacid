@@ -1,4 +1,4 @@
-// Copyright (C) 2025  Philip Linde
+// Copyright (C) 2025-2026  Philip Linde
 //
 // This file is part of Pocket Acid.
 //
@@ -20,7 +20,7 @@ const Kit = @import("Kit.zig");
 const DrumMachine = @This();
 const Mixer = @import("Mixer.zig");
 const midi = @import("midi.zig");
-const Accessor = @import("Accessor.zig").Accessor;
+const a = @import("access.zig");
 const Ducker = @import("Ducker.zig");
 const TextMatrix = @import("TextMatrix.zig");
 const Theme = @import("Theme.zig");
@@ -81,7 +81,6 @@ pub const Params = struct {
     accent: u8 = 0x40,
     kit: Kit.Id = .R6,
     duck_time: u8 = 0x20,
-    pub usingnamespace Accessor(@This());
 };
 
 channel: u4,
@@ -116,7 +115,7 @@ pub fn handleMidiEvent(self: *DrumMachine, event: midi.Event) void {
         .note_on => |e| {
             if (e.velocity == 0) return;
             const lev: f32 = if (e.velocity < 96)
-                @as(f32, @floatFromInt(@as(u8, 0xff) - self.params.get(.accent))) / 0xff
+                @as(f32, @floatFromInt(@as(u8, 0xff) - a.get(self.params, .accent))) / 0xff
             else
                 1;
 
@@ -126,7 +125,7 @@ pub fn handleMidiEvent(self: *DrumMachine, event: midi.Event) void {
             const tmm = self.mutes.get(.tm);
             const rscpm = self.mutes.get(.rscp);
 
-            const kit = self.params.get(.kit).resolve();
+            const kit = a.get(self.params, .kit).resolve();
 
             switch (e.pitch) {
                 0 => if (!bdm) {

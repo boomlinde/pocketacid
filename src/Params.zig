@@ -20,7 +20,7 @@ const DrumMachine = @import("DrumMachine.zig");
 const SoundEngine = @import("SoundEngine.zig");
 const StereoFeedbackDelay = @import("StereoFeedbackDelay.zig");
 const Mixer = @import("Mixer.zig");
-const Accessor = @import("Accessor.zig").Accessor;
+const a = @import("access.zig");
 
 engine: SoundEngine.Params = .{},
 bass1: DigiBass.Params = .{},
@@ -32,34 +32,34 @@ mixer: [Mixer.nchannels]Mixer.Channel.Params = [1]Mixer.Channel.Params{.{}} ** M
 pub fn copy(self: *const @This()) @This() {
     const mixer: [Mixer.nchannels]Mixer.Channel.Params = undefined;
     for (0..mixer.len) |i| {
-        mixer[i] = self.mixer[i].copy();
+        mixer[i] = a.copy(&self.mixer[i]);
     }
     return .{
-        .engine = self.engine.copy(),
-        .bass1 = self.bass1.copy(),
-        .bass2 = self.bass2.copy(),
-        .drums = self.drums.copy(),
-        .delay = self.delay.copy(),
+        .engine = a.copy(&self.engine),
+        .bass1 = a.copy(&self.bass1),
+        .bass2 = a.copy(&self.bass2),
+        .drums = a.copy(&self.drums),
+        .delay = a.copy(&self.delay),
         .mixer = mixer,
     };
 }
 
 pub fn assume(self: *@This(), other: *const @This()) void {
-    self.engine.assume(other.engine.copy());
-    self.bass1.assume(other.bass1.copy());
-    self.bass2.assume(other.bass2.copy());
-    self.drums.assume(other.drums.copy());
-    self.delay.assume(other.delay.copy());
-    for (0..Mixer.nchannels) |i| self.mixer[i].assume(other.mixer[i].copy());
+    a.assume(&self.engine, a.copy(&other.engine));
+    a.assume(&self.bass1, a.copy(&other.bass1));
+    a.assume(&self.bass2, a.copy(&other.bass2));
+    a.assume(&self.drums, a.copy(&other.drums));
+    a.assume(&self.delay, a.copy(&other.delay));
+    for (0..Mixer.nchannels) |i| a.assume(&self.mixer[i], a.copy(&other.mixer[i]));
 }
 
 pub fn assumeNoTempo(self: *@This(), other: *const @This()) void {
-    self.engine.set(.drive, other.engine.get(.drive));
-    self.engine.set(.mutes, other.engine.get(.mutes));
-    self.engine.set(.swing, other.engine.get(.swing));
-    self.bass1.assume(other.bass1.copy());
-    self.bass2.assume(other.bass2.copy());
-    self.drums.assume(other.drums.copy());
-    self.delay.assume(other.delay.copy());
-    for (0..Mixer.nchannels) |i| self.mixer[i].assume(other.mixer[i].copy());
+    a.set(&self.engine, .drive, a.get(&other.engine, .drive));
+    a.set(&self.engine, .mutes, a.get(&other.engine, .mutes));
+    a.set(&self.engine, .swing, a.get(&other.engine, .swing));
+    a.assume(&self.bass1, a.copy(&other.bass1));
+    a.assume(&self.bass2, a.copy(&other.bass2));
+    a.assume(&self.drums, a.copy(&other.drums));
+    a.assume(&self.delay, a.copy(&other.delay));
+    for (0..Mixer.nchannels) |i| a.assume(&self.mixer[i], a.copy(&other.mixer[i]));
 }

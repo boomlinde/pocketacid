@@ -41,6 +41,9 @@ const Params = @import("Params.zig");
 const Config = @import("Config.zig");
 const InputState = @import("ButtonHandler.zig").States;
 const ProjectPicker = @import("ProjectPicker.zig");
+const a = @import("access.zig");
+
+const io = @import("io.zig");
 
 const w = 30;
 const h = 22;
@@ -51,8 +54,9 @@ const Opts = struct {
 };
 
 pub fn main() !void {
+    io.init();
+
     // Parse args
-    const stderr = std.io.getStdErr().writer().any();
     var opts = Opts{};
 
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
@@ -66,7 +70,7 @@ pub fn main() !void {
 
     for (args[1..]) |arg| {
         if (std.mem.eql(u8, arg, "--help")) {
-            help(stderr, args[0]);
+            help(io.stderr, args[0]);
             return;
         }
         if (std.mem.eql(u8, arg, "--nokeyboard")) {
@@ -76,7 +80,7 @@ pub fn main() !void {
         if (opts.savepath_override == null)
             opts.savepath_override = arg
         else {
-            help(stderr, args[0]);
+            help(io.stderr, args[0]);
             std.process.exit(1);
         }
     }
@@ -399,7 +403,7 @@ pub fn sequencer(
         if (trig.comboPress("select")) mixer = !mixer;
         if (trig.comboPress("start")) Sys.sound_engine.startstop(arranger.row);
         if (Sys.sound_engine.isRunning()) tm.putch(0, 0, colors.playing, 0x10);
-        tm.print(1, 0, colors.normal, "{}", .{params.engine.get(.bpm)});
+        tm.print(1, 0, colors.normal, "{}", .{a.get(&params.engine, .bpm)});
         tm.print(5, 0, colors.faded(0.5).hilight, "({x:0>2})", .{config.project});
         params.engine.mutes.display(colors, &tm, 22, 0);
 
@@ -457,7 +461,7 @@ pub fn sequencer(
                         dt,
                         !arrange,
                         pi[arranger.column],
-                        params.engine.get(.mutes),
+                        a.get(&params.engine, .mutes),
                         colors,
                     );
                 },
@@ -501,33 +505,33 @@ fn joylessHandleParams(trig: ButtonHandler.States, mode: JoyMode, params: *DigiB
 
     if (xadd) |x| {
         const prev = switch (mode) {
-            .timbre_mod => params.get(.mod_depth),
-            .res_feedback => params.get(.feedback),
-            .decay_accent => params.get(.accentness),
+            .timbre_mod => a.get(params, .mod_depth),
+            .res_feedback => a.get(params, .feedback),
+            .decay_accent => a.get(params, .accentness),
         };
 
         const new: f32 = @min(1, @max(0, x + prev));
 
         switch (mode) {
-            .timbre_mod => params.setCmp(.mod_depth, new, prev),
-            .res_feedback => params.setCmp(.feedback, new, prev),
-            .decay_accent => params.setCmp(.accentness, new, prev),
+            .timbre_mod => a.setCmp(params, .mod_depth, new, prev),
+            .res_feedback => a.setCmp(params, .feedback, new, prev),
+            .decay_accent => a.setCmp(params, .accentness, new, prev),
         }
     }
 
     if (yadd) |y| {
         const prev = switch (mode) {
-            .timbre_mod => params.get(.timbre),
-            .res_feedback => params.get(.res),
-            .decay_accent => params.get(.decay),
+            .timbre_mod => a.get(params, .timbre),
+            .res_feedback => a.get(params, .res),
+            .decay_accent => a.get(params, .decay),
         };
 
         const new: f32 = @min(1, @max(0, y + prev));
 
         switch (mode) {
-            .timbre_mod => params.setCmp(.timbre, new, prev),
-            .res_feedback => params.setCmp(.res, new, prev),
-            .decay_accent => params.setCmp(.decay, new, prev),
+            .timbre_mod => a.setCmp(params, .timbre, new, prev),
+            .res_feedback => a.setCmp(params, .res, new, prev),
+            .decay_accent => a.setCmp(params, .decay, new, prev),
         }
     }
 }
@@ -538,27 +542,27 @@ fn handleParams(ux: f32, uy: f32, dt: f32, mode: JoyMode, params: *DigiBass.Para
     const y = uy * joy_sensitivity * dt;
     switch (mode) {
         .timbre_mod => {
-            const prevx = params.get(.mod_depth);
-            const prevy = params.get(.timbre);
-            params.setCmp(.mod_depth, @min(1, @max(0, x + prevx)), prevx);
-            params.setCmp(.timbre, @min(1, @max(0, prevy - y)), prevy);
+            const prevx = a.get(params, .mod_depth);
+            const prevy = a.get(params, .timbre);
+            a.setCmp(params, .mod_depth, @min(1, @max(0, x + prevx)), prevx);
+            a.setCmp(params, .timbre, @min(1, @max(0, prevy - y)), prevy);
         },
         .res_feedback => {
-            const prevx = params.get(.feedback);
-            const prevy = params.get(.res);
-            params.setCmp(.feedback, @min(1, @max(0, x + prevx)), prevx);
-            params.setCmp(.res, @min(1, @max(0, prevy - y)), prevy);
+            const prevx = a.get(params, .feedback);
+            const prevy = a.get(params, .res);
+            a.setCmp(params, .feedback, @min(1, @max(0, x + prevx)), prevx);
+            a.setCmp(params, .res, @min(1, @max(0, prevy - y)), prevy);
         },
         .decay_accent => {
-            const prevx = params.get(.accentness);
-            const prevy = params.get(.decay);
-            params.setCmp(.accentness, @min(1, @max(0, x + prevx)), prevx);
-            params.setCmp(.decay, @min(1, @max(0, prevy - y)), prevy);
+            const prevx = a.get(params, .accentness);
+            const prevy = a.get(params, .decay);
+            a.setCmp(params, .accentness, @min(1, @max(0, x + prevx)), prevx);
+            a.setCmp(params, .decay, @min(1, @max(0, prevy - y)), prevy);
         },
     }
 }
 
-fn help(writer: std.io.AnyWriter, arg0: []const u8) void {
+fn help(writer: *std.io.Writer, arg0: []const u8) void {
     writer.print("Usage: {s} [OPTIONS] [savedir]\n\n", .{arg0}) catch {};
     writer.print("Options:\n", .{}) catch {};
     writer.print("--help\n\tDisplay this information\n", .{}) catch {};

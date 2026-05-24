@@ -1,4 +1,4 @@
-// Copyright (C) 2025  Philip Linde
+// Copyright (C) 2025-2026  Philip Linde
 //
 // This file is part of Pocket Acid.
 //
@@ -49,7 +49,13 @@ pub const Id = enum {
         };
     }
 
-    pub usingnamespace NextPrevEnum(Id, false);
+    pub fn next(self: @This()) @This() {
+        return NextPrevEnum(@This(), false).next(self);
+    }
+
+    pub fn prev(self: @This()) @This() {
+        return NextPrevEnum(@This(), false).prev(self);
+    }
 };
 
 const term = theme(.{

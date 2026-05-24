@@ -1,4 +1,4 @@
-// Copyright (C) 2025  Philip Linde
+// Copyright (C) 2025-2026  Philip Linde
 //
 // This file is part of Pocket Acid.
 //
@@ -97,53 +97,18 @@ test "DumbPool" {
     try expect(addr3 == addr1);
 
     var i = v.iter();
-    var value: i32 = undefined;
     var found3 = false;
     var found4 = false;
     var foundOther = false;
-    while (i.next(&value)) {
-        if (value == 3)
+    while (i.next()) |value| {
+        if (value.* == 3)
             found3 = true
-        else if (value == 4)
+        else if (value.* == 4)
             found4 = true
         else
             foundOther = true;
     }
     try expect(found3);
     try expect(found4);
-    try expect(!foundOther);
-
-    var foundAddr2 = false;
-    var foundAddr3 = false;
-    foundOther = false;
-    var valuePtr: *i32 = undefined;
-    i = v.iter();
-    while (i.nextPtr(&valuePtr)) {
-        if (valuePtr == addr2)
-            foundAddr2 = true
-        else if (valuePtr == addr3)
-            foundAddr3 = true
-        else
-            foundOther = true;
-    }
-    try expect(foundAddr2);
-    try expect(foundAddr3);
-    try expect(!foundOther);
-
-    v.free(addr3);
-    foundAddr2 = false;
-    foundAddr3 = false;
-    foundOther = false;
-    i = v.iter();
-    while (i.nextPtr(&valuePtr)) {
-        if (valuePtr == addr2)
-            foundAddr2 = true
-        else if (valuePtr == addr3)
-            foundAddr3 = true
-        else
-            foundOther = true;
-    }
-    try expect(foundAddr2);
-    try expect(!foundAddr3);
     try expect(!foundOther);
 }

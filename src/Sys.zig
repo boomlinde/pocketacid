@@ -1,4 +1,4 @@
-// Copyright (C) 2025  Philip Linde
+// Copyright (C) 2025-2026  Philip Linde
 //
 // This file is part of Pocket Acid.
 //
@@ -35,7 +35,7 @@ var midibuf = MidiBuf{ .buf = &midibuf_buf };
 pub var sound_engine = SoundEngine{ .midibuf = &midibuf };
 
 var spec: sdl.AudioSpec = undefined;
-fn audiocb(data: ?*anyopaque, stream: [*c]u8, byte_len: c_int) callconv(.C) void {
+fn audiocb(data: ?*anyopaque, stream: [*c]u8, byte_len: c_int) callconv(.c) void {
     _ = data;
     const f32a = @alignOf(*Frame);
     const alt = @as([*c]align(f32a) u8, @alignCast(stream));

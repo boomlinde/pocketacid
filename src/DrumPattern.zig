@@ -1,4 +1,4 @@
-// Copyright (C) 2025  Philip Linde
+// Copyright (C) 2025-2026  Philip Linde
 //
 // This file is part of Pocket Acid.
 //
@@ -115,7 +115,13 @@ pub const DrumType = enum {
         };
     }
 
-    pub usingnamespace NextPrevEnum(@This(), false);
+    pub fn next(self: *DrumType) void {
+        return NextPrevEnum(@This(), false).next(self);
+    }
+
+    pub fn prev(self: *DrumType) void {
+        return NextPrevEnum(@This(), false).prev(self);
+    }
 };
 
 steps: [maxlen]Step = [1]Step{.{}} ** maxlen,

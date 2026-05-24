@@ -1,4 +1,4 @@
-// Copyright (C) 2025  Philip Linde
+// Copyright (C) 2025-2026  Philip Linde
 //
 // This file is part of Pocket Acid.
 //
@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Pocket Acid.  If not, see <https://www.gnu.org/licenses/>.
 
-const Accessor = @import("Accessor.zig").Accessor;
+const a = @import("access.zig");
 
 const State = enum { attack, decay };
 
@@ -29,8 +29,6 @@ pub const Params = struct {
     decay: f32 = 0.1,
     attack_shape: f32 = 0,
     decay_shape: f32 = 0,
-
-    pub usingnamespace Accessor(@This());
 };
 
 pub fn trigger(self: *ADEnv) void {
@@ -39,8 +37,8 @@ pub fn trigger(self: *ADEnv) void {
 }
 
 pub fn next(self: *ADEnv, params: *const Params, srate: f32) f32 {
-    const ap = params.get(.attack);
-    const dp = params.get(.decay);
+    const ap = a.get(params, .attack);
+    const dp = a.get(params, .decay);
     const attack = ap * ap * 5;
     const decay = dp * dp * 5;
 
@@ -61,17 +59,17 @@ pub fn next(self: *ADEnv, params: *const Params, srate: f32) f32 {
             0,
     }
 
-    const a: f32 = self.charge * self.charge;
-    const b: f32 = 1 - (1 - self.charge) * (1 - self.charge);
+    const x: f32 = self.charge * self.charge;
+    const y: f32 = 1 - (1 - self.charge) * (1 - self.charge);
 
     const shape_param = switch (self.state) {
-        .attack => params.get(.attack_shape),
-        .decay => params.get(.decay_shape),
+        .attack => a.get(params, .attack_shape),
+        .decay => a.get(params, .decay_shape),
     };
 
-    return lerp(a, b, shape_param);
+    return lerp(x, y, shape_param);
 }
 
-inline fn lerp(a: f32, b: f32, mix: f32) f32 {
-    return a * (1 - mix) + b * mix;
+inline fn lerp(x: f32, y: f32, mix: f32) f32 {
+    return x * (1 - mix) + y * mix;
 }

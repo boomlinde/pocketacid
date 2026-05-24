@@ -15,15 +15,13 @@
 // You should have received a copy of the GNU General Public License
 // along with Pocket Acid.  If not, see <https://www.gnu.org/licenses/>.
 
-current: f32 = 1,
+const std = @import("std");
 
-pub inline fn trigger(self: *@This()) void {
-    self.current = 0;
-}
+pub var buf: [4096]u8 = undefined;
+pub var stderr_file: std.fs.File.Writer = undefined;
+pub var stderr: *std.io.Writer = undefined;
 
-pub fn next(self: *@This(), time_param: u8, srate: f32) f32 {
-    const base_time: f32 = @as(f32, @floatFromInt(time_param)) / 0xff;
-    const time = base_time * 0.5 + 1 / 0x200;
-    defer self.current = @min(self.current + 1 / (time * srate), 1.0);
-    return self.current * self.current;
+pub fn init() void {
+    stderr_file = std.fs.File.stderr().writer(&.{});
+    stderr = &stderr_file.interface;
 }

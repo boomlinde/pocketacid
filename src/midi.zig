@@ -1,4 +1,4 @@
-// Copyright (C) 2025  Philip Linde
+// Copyright (C) 2025-2026  Philip Linde
 //
 // This file is part of Pocket Acid.
 //
@@ -82,34 +82,34 @@ pub const Event = union(enum) {
 
     fn decode(status: u8, data: []u7) ?Event {
         return switch (status & 0xf0) {
-            0x80 => NoteOff.decode(status, data),
-            0x90 => NoteOn.decode(status, data),
-            0xa0 => PolyphonicAftertouch.decode(status, data),
-            0xb0 => ControlChange.decode(status, data),
-            0xc0 => ProgramChange.decode(status, data),
-            0xd0 => ChannelAftertouch.decode(status, data),
-            0xe0 => PitchWheel.decode(status, data),
+            0x80 => Encodable(NoteOff).decode(status, data),
+            0x90 => Encodable(NoteOn).decode(status, data),
+            0xa0 => Encodable(PolyphonicAftertouch).decode(status, data),
+            0xb0 => Encodable(ControlChange).decode(status, data),
+            0xc0 => Encodable(ProgramChange).decode(status, data),
+            0xd0 => Encodable(ChannelAftertouch).decode(status, data),
+            0xe0 => Encodable(PitchWheel).decode(status, data),
             0xf0 => switch (status) {
                 // SysEx
-                0xf0 => SysexBegin.decode(status, data),
-                0xf7 => SysexEnd.decode(status, data),
+                0xf0 => Encodable(SysexBegin).decode(status, data),
+                0xf7 => Encodable(SysexEnd).decode(status, data),
 
                 // MTC
-                0xf1 => QuarterFrame.decode(status, data),
+                0xf1 => Encodable(QuarterFrame).decode(status, data),
 
                 // System Common
-                0xf2 => SongPointer.decode(status, data),
-                0xf3 => SongSelect.decode(status, data),
-                0xf6 => TuneRequest.decode(status, data),
+                0xf2 => Encodable(SongPointer).decode(status, data),
+                0xf3 => Encodable(SongSelect).decode(status, data),
+                0xf6 => Encodable(TuneRequest).decode(status, data),
 
                 // System realtime
-                0xf8 => TimingClock.decode(status, data),
-                0xf9 => MeasureEnd.decode(status, data),
-                0xfa => Start.decode(status, data),
-                0xfb => Continue.decode(status, data),
-                0xfc => Stop.decode(status, data),
-                0xfe => ActiveSensing.decode(status, data),
-                0xff => Reset.decode(status, data),
+                0xf8 => Encodable(TimingClock).decode(status, data),
+                0xf9 => Encodable(MeasureEnd).decode(status, data),
+                0xfa => Encodable(Start).decode(status, data),
+                0xfb => Encodable(Continue).decode(status, data),
+                0xfc => Encodable(Stop).decode(status, data),
+                0xfe => Encodable(ActiveSensing).decode(status, data),
+                0xff => Encodable(Reset).decode(status, data),
 
                 else => null,
             },
@@ -120,104 +120,104 @@ pub const Event = union(enum) {
         channel: u4,
         pitch: u7,
         velocity: u7,
-        pub usingnamespace Encodable(@This(), 0x80);
+        const status_mask = 0x80;
     };
 
     pub const NoteOn = struct {
         channel: u4,
         pitch: u7,
         velocity: u7,
-        pub usingnamespace Encodable(@This(), 0x90);
+        const status_mask = 0x90;
     };
 
     pub const PolyphonicAftertouch = struct {
         channel: u4,
         pitch: u7,
         pressure: u7,
-        pub usingnamespace Encodable(@This(), 0xa0);
+        const status_mask = 0xa0;
     };
 
     pub const ControlChange = struct {
         channel: u4,
         controller: u7,
         value: u7,
-        pub usingnamespace Encodable(@This(), 0xb0);
+        const status_mask = 0xb0;
     };
 
     pub const ProgramChange = struct {
         channel: u4,
         program: u7,
-        pub usingnamespace Encodable(@This(), 0xc0);
+        const status_mask = 0xc0;
     };
 
     pub const ChannelAftertouch = struct {
         channel: u4,
         pressure: u7,
-        pub usingnamespace Encodable(@This(), 0xd0);
+        const status_mask = 0xd0;
     };
 
     pub const PitchWheel = struct {
         channel: u4,
         value: u14,
-        pub usingnamespace Encodable(@This(), 0xe0);
+        const status_mask = 0xe0;
     };
 
     pub const SongSelect = struct {
         song: u7,
-        pub usingnamespace Encodable(@This(), 0xf3);
+        const status_mask = 0xf3;
     };
 
     pub const SongPointer = struct {
         value: u14,
-        pub usingnamespace Encodable(@This(), 0xf2);
+        const status_mask = 0xf2;
     };
 
     pub const QuarterFrame = struct {
         value: u7,
-        pub usingnamespace Encodable(@This(), 0xf1);
+        const status_mask = 0xf1;
     };
 
     pub const SysexBegin = struct {
-        pub usingnamespace Encodable(@This(), 0xf0);
+        const status_mask = 0xf0;
     };
 
     pub const SysexEnd = struct {
-        pub usingnamespace Encodable(@This(), 0xf7);
+        const status_mask = 0xf7;
     };
 
     pub const TuneRequest = struct {
-        pub usingnamespace Encodable(@This(), 0xf6);
+        const status_mask = 0xf6;
     };
 
     pub const TimingClock = struct {
-        pub usingnamespace Encodable(@This(), 0xf8);
+        const status_mask = 0xf8;
     };
 
     pub const MeasureEnd = struct {
-        pub usingnamespace Encodable(@This(), 0xf9);
+        const status_mask = 0xf9;
     };
 
     pub const Start = struct {
-        pub usingnamespace Encodable(@This(), 0xfa);
+        const status_mask = 0xfa;
     };
 
     pub const Continue = struct {
-        pub usingnamespace Encodable(@This(), 0xfb);
+        const status_mask = 0xfb;
     };
 
     pub const Stop = struct {
-        pub usingnamespace Encodable(@This(), 0xfc);
+        const status_mask = 0xfc;
     };
 
     pub const ActiveSensing = struct {
-        pub usingnamespace Encodable(@This(), 0xfe);
+        const status_mask = 0xfe;
     };
 
     pub const Reset = struct {
-        pub usingnamespace Encodable(@This(), 0xff);
+        const status_mask = 0xff;
     };
 
-    fn Encodable(comptime T: type, comptime statusMask: u8) type {
+    fn Encodable(comptime T: type) type {
         const std = @import("std");
         const len = lenblk: {
             var l: usize = 0;
@@ -274,9 +274,9 @@ pub const Event = union(enum) {
                 var out: [T.size()]u8 = undefined;
 
                 out[0] = (if (@hasField(T, "channel"))
-                    statusMask | self.channel
+                    T.status_mask | self.channel
                 else
-                    statusMask);
+                    T.status_mask);
                 var idx: usize = 1;
                 inline for (std.meta.fields(T)) |field| {
                     switch (field.type) {

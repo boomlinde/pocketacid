@@ -1,4 +1,4 @@
-// Copyright (C) 2025  Philip Linde
+// Copyright (C) 2025-2026  Philip Linde
 //
 // This file is part of Pocket Acid.
 //
@@ -20,6 +20,7 @@ const Parser = @import("Parser.zig");
 const Tokenizer = @import("Tokenizer.zig");
 const Theme = @import("Theme.zig");
 const FontType = @import("CharDisplay.zig").FontType;
+const io = @import("io.zig");
 
 const configname = "settings.cfg";
 
@@ -39,8 +40,9 @@ pub fn load(self: *@This(), dir: std.fs.Dir) !void {
     defer file.close();
 
     var tokenbuf: [64]u8 = undefined;
+    var reader = file.reader(&io.buf);
     var tokenizer = Tokenizer{
-        .reader = file.reader().any(),
+        .reader = &reader.interface,
         .buf = &tokenbuf,
     };
 
@@ -50,11 +52,14 @@ pub fn load(self: *@This(), dir: std.fs.Dir) !void {
 }
 
 pub fn save(self: *const @This(), dir: std.fs.Dir) !void {
-    const file = try dir.createFile(configname ++ ".tmp", .{});
-    const writer = file.writer().any();
-    defer file.close();
+    {
+        const file = try dir.createFile(configname ++ ".tmp", .{});
+        var writer = file.writer(&io.buf);
+        defer file.close();
 
-    try Parser.serialize(self.*, writer);
-    try writer.writeAll("\n");
+        try Parser.serialize(self.*, &writer.interface);
+        try writer.interface.writeAll("\n");
+        try writer.interface.flush();
+    }
     try dir.rename(configname ++ ".tmp", configname);
 }

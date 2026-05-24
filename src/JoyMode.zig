@@ -17,6 +17,7 @@
 
 const DigiBass = @import("DigiBass.zig");
 const std = @import("std");
+const a = @import("access.zig");
 
 pub const JoyMode = enum {
     timbre_mod,
@@ -66,16 +67,16 @@ pub const JoyMode = enum {
         const FloatPair = struct { x: f32, y: f32 };
         const v: FloatPair = switch (self) {
             .timbre_mod => .{
-                .y = params.get(.timbre),
-                .x = params.get(.mod_depth),
+                .y = a.get(params, .timbre),
+                .x = a.get(params, .mod_depth),
             },
             .res_feedback => .{
-                .y = params.get(.res),
-                .x = params.get(.feedback),
+                .y = a.get(params, .res),
+                .x = a.get(params, .feedback),
             },
             .decay_accent => .{
-                .y = params.get(.decay),
-                .x = params.get(.accentness),
+                .y = a.get(params, .decay),
+                .x = a.get(params, .accentness),
             },
         };
 

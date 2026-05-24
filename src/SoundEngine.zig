@@ -26,7 +26,7 @@ const StereoFeedbackDelay = @import("StereoFeedbackDelay.zig");
 const calcDrive = @import("drive.zig").drive;
 const song = @import("song.zig");
 const GlobalParams = @import("Params.zig");
-const Accessor = @import("Accessor.zig").Accessor;
+const a = @import("access.zig");
 
 const maxtempo = 300;
 const mintempo = 1;
@@ -40,12 +40,10 @@ pub const Params = struct {
     mutes: DrumMachine.Mutes = .{},
     swing: u8 = 0,
 
-    pub usingnamespace Accessor(@This());
-
     pub inline fn changeTempo(self: *@This(), change: i16) void {
-        const bpm = self.get(.bpm);
+        const bpm = a.get(self, .bpm);
         const new = @min(maxtempo, @max(mintempo, bpm + change));
-        self.set(.bpm, new);
+        a.set(self, .bpm, new);
     }
 };
 
@@ -129,8 +127,8 @@ pub fn init(self: *@This(), params: *GlobalParams) void {
 }
 
 pub fn resetDelay(self: *@This()) void {
-    const time = @as(f32, @floatFromInt(self.delay.params.get(.time))) / 16;
-    const tempo: f32 = @floatFromInt(self.params.get(.bpm));
+    const time = @as(f32, @floatFromInt(a.get(self.delay.params, .time))) / 16;
+    const tempo: f32 = @floatFromInt(a.get(self.params, .bpm));
     self.delay.smoothed_delay_time.short(StereoFeedbackDelay.calcDelayTime(time, tempo));
 }
 
@@ -143,7 +141,7 @@ pub fn everyBuffer(self: *@This()) void {
             const snap_idx = @atomicLoad(u8, &song.snap_map[cmd.row], .seq_cst);
             const snap = &song.snapshots[snap_idx];
             if (!running and snap.active())
-                self.params.set(.bpm, snap.params.engine.get(.bpm));
+                a.set(self.params, .bpm, a.get(&snap.params.engine, .bpm));
             self.start(cmd.row, running);
         },
         .enqueue => {
@@ -193,7 +191,7 @@ var sample: u64 = 0;
 pub fn next(self: *@This(), srate: f32) Mixer.Frame {
     defer sample += 1;
 
-    const bpm: f32 = @floatFromInt(self.params.get(.bpm));
+    const bpm: f32 = @floatFromInt(a.get(self.params, .bpm));
     const gated = @mod(shuffleSkew(self.phase, self.swing) * 12, 1) < 0.5;
     const prevgated = @mod(shuffleSkew(self.prevphase, self.swing) * 12, 1) < 0.5;
     const tick = gated and !prevgated;
@@ -215,7 +213,7 @@ pub fn next(self: *@This(), srate: f32) Mixer.Frame {
 
     if (self.prevphase >= self.phase) {
         // Reload swing value
-        const swing = self.params.get(.swing);
+        const swing = a.get(self.params, .swing);
         self.swing = swing;
     }
 
@@ -229,7 +227,7 @@ pub fn next(self: *@This(), srate: f32) Mixer.Frame {
     }
 
     // TODO can this be handled by DrumMachine itself?
-    const duck = self.drums.ducker.next(self.drums.params.get(.duck_time), srate);
+    const duck = self.drums.ducker.next(a.get(self.drums.params, .duck_time), srate);
 
     // TODO better way of naming channel indices
     self.mixer.channels[0].in = self.pdbass1.next(srate);
@@ -240,7 +238,7 @@ pub fn next(self: *@This(), srate: f32) Mixer.Frame {
     var out = self.mixer.mix(&send, duck);
     out.add(self.delay.next(send, bpm, duck, srate));
 
-    const drive = self.params.get(.drive);
+    const drive = a.get(self.params, .drive);
     return .{
         .left = calcDrive(out.left, drive),
         .right = calcDrive(out.right, drive),

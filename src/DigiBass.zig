@@ -23,8 +23,7 @@ const MonoVoiceManager = @import("MonoVoiceManager.zig");
 const DigiBass = @This();
 const Smoother = @import("Smoother.zig");
 const ADEnv = @import("ADEnv.zig");
-
-const Accessor = @import("Accessor.zig").Accessor;
+const a = @import("access.zig");
 
 pub const Params = struct {
     pub const Type = enum(u8) { pd, fm };
@@ -39,8 +38,6 @@ pub const Params = struct {
 
     decay: f32 = 0.2,
     accentness: f32 = 0.3,
-
-    pub usingnamespace Accessor(@This());
 };
 
 const param_smooth_time = 0.1;
@@ -72,27 +69,27 @@ feedback_smooth: Smoother = .{},
 mod_smooth: Smoother = .{},
 
 pub fn short(self: *DigiBass) void {
-    self.accentness_smooth.short(self.params.get(.accentness));
-    self.timbre_smooth.short(self.params.get(.timbre));
-    self.res_smooth.short(self.params.get(.res));
-    self.mod_smooth.short(self.params.get(.mod_depth));
-    self.feedback_smooth.short(self.params.get(.feedback));
+    self.accentness_smooth.short(a.get(self.params, .accentness));
+    self.timbre_smooth.short(a.get(self.params, .timbre));
+    self.res_smooth.short(a.get(self.params, .res));
+    self.mod_smooth.short(a.get(self.params, .mod_depth));
+    self.feedback_smooth.short(a.get(self.params, .feedback));
 }
 
 pub inline fn next(self: *DigiBass, srate: f32) f32 {
-    return switch (self.params.get(.sound_type)) {
+    return switch (a.get(self.params, .sound_type)) {
         .fm => self.nextFM(srate),
         .pd => self.nextPD(srate),
     };
 }
 
 pub inline fn nextFM(self: *DigiBass, srate: f32) f32 {
-    const accentness_raw = self.accentness_smooth.next(self.params.get(.accentness), param_smooth_time, srate);
+    const accentness_raw = self.accentness_smooth.next(a.get(self.params, .accentness), param_smooth_time, srate);
     const bend = self.bend_smooth.next(self.bend, bend_smooth_time, srate);
-    const timbre = self.timbre_smooth.next(self.params.get(.timbre), param_smooth_time, srate);
-    const res = self.res_smooth.next(self.params.get(.res), param_smooth_time, srate);
-    const mod = self.mod_smooth.next(self.params.get(.mod_depth), param_smooth_time, srate);
-    const feedback = self.feedback_smooth.next(self.params.get(.feedback), param_smooth_time, srate);
+    const timbre = self.timbre_smooth.next(a.get(self.params, .timbre), param_smooth_time, srate);
+    const res = self.res_smooth.next(a.get(self.params, .res), param_smooth_time, srate);
+    const mod = self.mod_smooth.next(a.get(self.params, .mod_depth), param_smooth_time, srate);
+    const feedback = self.feedback_smooth.next(a.get(self.params, .feedback), param_smooth_time, srate);
     const state = self.legato.next(self.man.state, srate);
 
     if (self.man.state.gate and !self.prev_gate) {
@@ -112,7 +109,7 @@ pub inline fn nextFM(self: *DigiBass, srate: f32) f32 {
     else
         .{
             .attack = 0,
-            .decay = self.params.get(.decay),
+            .decay = a.get(self.params, .decay),
             .attack_shape = 0.5,
             .decay_shape = 0.5,
         };
@@ -162,12 +159,12 @@ pub inline fn nextFM(self: *DigiBass, srate: f32) f32 {
 }
 
 pub inline fn nextPD(self: *DigiBass, srate: f32) f32 {
-    const accentness_raw = self.accentness_smooth.next(self.params.get(.accentness), param_smooth_time, srate);
+    const accentness_raw = self.accentness_smooth.next(a.get(self.params, .accentness), param_smooth_time, srate);
     const bend = self.bend_smooth.next(self.bend, bend_smooth_time, srate);
-    const timbre = self.timbre_smooth.next(self.params.get(.timbre), param_smooth_time, srate);
-    const res = self.res_smooth.next(self.params.get(.res), param_smooth_time, srate);
-    const mod = self.mod_smooth.next(self.params.get(.mod_depth), param_smooth_time, srate);
-    const feedback = self.feedback_smooth.next(self.params.get(.feedback), param_smooth_time, srate);
+    const timbre = self.timbre_smooth.next(a.get(self.params, .timbre), param_smooth_time, srate);
+    const res = self.res_smooth.next(a.get(self.params, .res), param_smooth_time, srate);
+    const mod = self.mod_smooth.next(a.get(self.params, .mod_depth), param_smooth_time, srate);
+    const feedback = self.feedback_smooth.next(a.get(self.params, .feedback), param_smooth_time, srate);
     const state = self.legato.next(self.man.state, srate);
 
     const res2_amp = r2a: {
@@ -192,7 +189,7 @@ pub inline fn nextPD(self: *DigiBass, srate: f32) f32 {
     else
         .{
             .attack = 0,
-            .decay = self.params.get(.decay),
+            .decay = a.get(self.params, .decay),
             .attack_shape = 0.5,
             .decay_shape = 0.5,
         };
@@ -258,23 +255,23 @@ pub fn mod_env_params(accentness: f32, user_params: ADEnv.Params) ADEnv.Params {
     return .{ .time = lerp(user_params.time, 0.2, accentness), .shape = user_params.shape };
 }
 
-fn lerp(a: f32, b: f32, m: f32) f32 {
-    return (1 - m) * a + m * b;
+fn lerp(x: f32, y: f32, m: f32) f32 {
+    return (1 - m) * x + m * y;
 }
 
-inline fn clamp01(a: f32) f32 {
-    return @max(0, @min(1, a));
+inline fn clamp01(x: f32) f32 {
+    return @max(0, @min(1, x));
 }
 
-inline fn clamp(a: f32) f32 {
-    return @max(-1, @min(1, a));
+inline fn clamp(x: f32) f32 {
+    return @max(-1, @min(1, x));
 }
 
-inline fn dual(control: f32) struct { a: f32, b: f32 } {
+inline fn dual(control: f32) struct { x: f32, y: f32 } {
     return if (control >= 0.5)
-        .{ .a = normal(control), .b = 0 }
+        .{ .x = normal(control), .y = 0 }
     else
-        .{ .b = normal(control), .a = 0 };
+        .{ .y = normal(control), .x = 0 };
 }
 
 fn normal(control: f32) f32 {
@@ -308,8 +305,8 @@ fn cross(phase: f32, mod: f32, v: f32) f32 {
     return mix_out;
 }
 
-inline fn logize3(a: f32) f32 {
-    const m = 1 - a;
+inline fn logize3(x: f32) f32 {
+    const m = 1 - x;
     return 1 - m * m * m;
 }
 

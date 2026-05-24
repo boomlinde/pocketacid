@@ -1,4 +1,4 @@
-// Copyright (C) 2025  Philip Linde
+// Copyright (C) 2025-2026  Philip Linde
 //
 // This file is part of Pocket Acid.
 //
@@ -16,7 +16,7 @@
 // along with Pocket Acid.  If not, see <https://www.gnu.org/licenses/>.
 
 const FractionalDelayLine = @import("FractionalDelayLine.zig");
-const Accessor = @import("Accessor.zig").Accessor;
+const a = @import("access.zig");
 const Frame = @import("Mixer.zig").Frame;
 const Smoother = @import("Smoother.zig");
 
@@ -26,8 +26,6 @@ pub const Params = struct {
     time: u8 = 0x30,
     feedback: u8 = 0x80,
     duck: u8 = 0,
-
-    pub usingnamespace Accessor(@This());
 };
 
 left: FractionalDelayLine,
@@ -37,9 +35,9 @@ params: *const Params,
 smoothed_delay_time: Smoother = .{},
 
 pub fn next(self: *@This(), in: Frame, bpm: f32, duck: f32, srate: f32) Frame {
-    const time = @as(f32, @floatFromInt(self.params.get(.time))) / 16;
-    const feedback = @as(f32, @floatFromInt(self.params.get(.feedback))) / 0x100;
-    const duck_level = @as(f32, @floatFromInt(self.params.get(.duck))) / 0xff;
+    const time = @as(f32, @floatFromInt(a.get(self.params, .time))) / 16;
+    const feedback = @as(f32, @floatFromInt(a.get(self.params, .feedback))) / 0x100;
+    const duck_level = @as(f32, @floatFromInt(a.get(self.params, .duck))) / 0xff;
 
     const smoothed = self.smoothed_delay_time.next(calcDelayTime(time, bpm), smooth_time, srate);
 

@@ -25,7 +25,7 @@ will be available under the ports entry in the main menu on the next boot.
 To install on Windows, simply extract the `.win64.zip` archive to the desired
 location.
 
-To build on Linux, build the port using zig 0.14.1 compiler. After you run the
+To build on Linux, build the port using zig 0.15.2 compiler. After you run the
 `release.sh` script, that version of Zig will be available in prereqs/zig.
 
 Then you can simply run:
@@ -584,7 +584,7 @@ This project uses resources from multiple authors:
 ## Copyright and license
 
     Pocket Acid
-    Copyright (C)  2025 Philip Linde
+    Copyright (C)  2025-2026 Philip Linde
     
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

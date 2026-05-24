@@ -1,4 +1,4 @@
-// Copyright (C) 2025  Philip Linde
+// Copyright (C) 2025-2026  Philip Linde
 //
 // This file is part of Pocket Acid.
 //
@@ -16,7 +16,7 @@
 // along with Pocket Acid.  If not, see <https://www.gnu.org/licenses/>.
 
 const std = @import("std");
-const Accessor = @import("Accessor.zig").Accessor;
+const a = @import("access.zig");
 
 pub const Channels = struct {
     pub const bass1 = 0;
@@ -43,8 +43,6 @@ pub const Channel = struct {
         pan: u8 = 0x80,
         send: u8 = 0x00,
         duck: u8 = 0x00,
-
-        pub usingnamespace Accessor(@This());
     };
 
     label: []const u8,
@@ -55,9 +53,9 @@ pub const Channel = struct {
     inline fn mix(self: *Channel, duck: f32) Frame {
         defer self.in = 0;
 
-        const level = @as(f32, @floatFromInt(self.params.get(.level))) / 0xff;
-        const pan = @as(f32, @floatFromInt(self.params.get(.pan))) / 0x100;
-        const duck_level = @as(f32, @floatFromInt(self.params.get(.duck))) / 0xff;
+        const level = @as(f32, @floatFromInt(a.get(self.params, .level))) / 0xff;
+        const pan = @as(f32, @floatFromInt(a.get(self.params, .pan))) / 0x100;
+        const duck_level = @as(f32, @floatFromInt(a.get(self.params, .duck))) / 0xff;
 
         const total_duck = (1 - duck_level) + duck * duck_level;
 
@@ -79,7 +77,7 @@ pub fn mix(self: *Mixer, send: *Frame, duck: f32) Frame {
     for (&self.channels) |*channel| {
         const mx = channel.mix(duck);
 
-        const send_level = @as(f32, @floatFromInt(channel.params.get(.send))) / 0x100;
+        const send_level = @as(f32, @floatFromInt(a.get(channel.params, .send))) / 0x100;
 
         out.add(mx);
         send.add(.{ .left = mx.left * send_level, .right = mx.right * send_level });

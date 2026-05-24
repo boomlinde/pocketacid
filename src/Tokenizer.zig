@@ -1,4 +1,4 @@
-// Copyright (C) 2025  Philip Linde
+// Copyright (C) 2025-2026  Philip Linde
 //
 // This file is part of Pocket Acid.
 //
@@ -19,7 +19,7 @@ const std = @import("std");
 
 const Tokenizer = @This();
 
-reader: std.io.AnyReader,
+reader: *std.io.Reader,
 buf: []u8,
 n: usize = 0,
 again: ?u8 = null,
@@ -95,7 +95,7 @@ fn nextByte(self: *Tokenizer) !?u8 {
         return peeked;
     }
     var ch: [1]u8 = undefined;
-    const nread = try self.reader.read(&ch);
+    const nread = try self.reader.readSliceShort(&ch);
     if (nread == 0) return null;
     return ch[0];
 }
@@ -110,11 +110,11 @@ pub fn next(self: *Tokenizer) !?[]u8 {
 }
 
 test "Tokenizer" {
-    var stream = testStream("{a\\ x: 10 b: \"hejsan \\\"hoppsan\\\"\"}");
+    var stream = std.io.Reader.fixed("{a\\ x: 10 b: \"hejsan \\\"hoppsan\\\"\"}");
 
     var tokenbuf: [32]u8 = undefined;
     var t = Tokenizer{
-        .reader = stream.reader().any(),
+        .reader = &stream,
         .buf = &tokenbuf,
     };
 
@@ -128,8 +128,4 @@ test "Tokenizer" {
         i += 1;
     }
     try std.testing.expect(i == expected.len);
-}
-
-fn testStream(str: []const u8) std.io.FixedBufferStream([]const u8) {
-    return std.io.FixedBufferStream([]const u8){ .buffer = str, .pos = 0 };
 }

@@ -29,6 +29,8 @@ const Ducker = @import("Ducker.zig");
 const Kit = @import("Kit.zig");
 const Params = @import("Params.zig");
 const Snapshot = @import("Snapshot.zig");
+const io = @import("io.zig");
+const a = @import("access.zig");
 
 var chunkbuf: [0xffff]u8 = undefined;
 
@@ -74,7 +76,7 @@ pub const State = struct {
     snap_map: *[256]u8,
 };
 
-fn writeChunk(tag: ChunkTag, version: u16, data: []const u8, w: std.io.AnyWriter) !void {
+fn writeChunk(tag: ChunkTag, version: u16, data: []const u8, w: *std.io.Writer) !void {
     if (data.len > 0xffff) return error.TooBigChunk;
 
     try w.writeAll(&tag.str());
@@ -86,10 +88,10 @@ fn writeChunk(tag: ChunkTag, version: u16, data: []const u8, w: std.io.AnyWriter
 const ChunkHandle = struct {
     tag: ChunkTag,
     version: u16,
-    w: std.io.FixedBufferStream([]u8),
+    w: std.io.Writer,
 
-    fn finalize(self: *const ChunkHandle, w: std.io.AnyWriter) !void {
-        try writeChunk(self.tag, self.version, self.w.buffer[0..self.w.pos], w);
+    fn finalize(self: *const ChunkHandle, w: *std.io.Writer) !void {
+        try writeChunk(self.tag, self.version, self.w.buffer[0..self.w.end], w);
     }
 };
 
@@ -97,61 +99,62 @@ fn beginChunk(tag: ChunkTag, version: u16) ChunkHandle {
     return .{
         .tag = tag,
         .version = version,
-        .w = .{ .buffer = &chunkbuf, .pos = 0 },
+        .w = std.io.Writer.fixed(&chunkbuf),
     };
 }
 
 pub fn load(dir: std.fs.Dir, fname: []const u8, state: State) !void {
-    const stderr = std.io.getStdErr().writer().any();
     const file = dir.openFile(fname, .{ .mode = .read_only }) catch |err| {
         if (err == error.FileNotFound) return else {
-            stderr.print("failed to open save file: {}\n", .{err}) catch {};
+            io.stderr.print("failed to open save file: {}\n", .{err}) catch {};
             return err;
         }
     };
     defer file.close();
 
-    var br = std.io.bufferedReader(file.reader());
-
-    loadReader(br.reader().any(), state) catch |err| {
-        stderr.print("failed to load save file: {}\n", .{err}) catch {};
+    var br = file.reader(&io.buf);
+    loadReader(&br.interface, state) catch |err| {
+        io.stderr.print("failed to load save file: {}\n", .{err}) catch {};
         return err;
     };
 }
 
 pub fn save(dir: std.fs.Dir, fname: []const u8, tmpname: []const u8, state: State) void {
-    const stderr = std.io.getStdErr().writer().any();
     {
         const f = dir.createFile(tmpname, .{}) catch |err| {
-            stderr.print("failed to create temporary save file: {}\n", .{err}) catch {};
+            io.stderr.print("failed to create temporary save file: {}\n", .{err}) catch {};
             return;
         };
-        const writer = f.writer().any();
+        var writer = f.writer(&io.buf);
         defer f.close();
 
-        saveWriter(writer, state) catch |err| {
-            stderr.print("failed to write save: {}\n", .{err}) catch {};
+        saveWriter(&writer.interface, state) catch |err| {
+            io.stderr.print("failed to write save: {}\n", .{err}) catch {};
+            return;
+        };
+        writer.interface.flush() catch |err| {
+            io.stderr.print("failed to write save: {}\n", .{err}) catch {};
             return;
         };
     }
     dir.rename(tmpname, fname) catch |err| {
-        stderr.print("failed to rename temporary save file: {}\n", .{err}) catch {};
+        io.stderr.print("failed to rename temporary save file: {}\n", .{err}) catch {};
         return;
     };
 }
 
-pub fn loadReader(r: std.io.AnyReader, s: State) !void {
+pub fn loadReader(r: *std.io.Reader, s: State) !void {
     chunkloop: while (true) {
         var tagnamebuf: [4]u8 = undefined;
-        r.readNoEof(&tagnamebuf) catch |err| {
+        r.readSliceAll(&tagnamebuf) catch |err| {
             if (err == error.EndOfStream)
                 break :chunkloop
             else
                 return err;
         };
         const tag = std.meta.stringToEnum(ChunkTag, &tagnamebuf) orelse return error.UnknownTag;
-        const version = try r.readInt(u16, .little);
-        const len = try r.readInt(u16, .little);
+        const version = try r.takeInt(u16, .little);
+        const len = try r.takeInt(u16, .little);
 
         switch (tag) {
             .ARRS => try readArrangerState(r, s.arranger, version, len),
@@ -167,13 +170,13 @@ pub fn loadReader(r: std.io.AnyReader, s: State) !void {
     }
 }
 
-fn readSnapshots(r: std.io.AnyReader, snapshots: *[256]Snapshot, version: u16, len: u16) !void {
+fn readSnapshots(r: *std.io.Reader, snapshots: *[256]Snapshot, version: u16, len: u16) !void {
     switch (version) {
         1 => {
             if (len != 73 * 256) return error.SnapshotsBadLength;
 
             for (0..256) |i| {
-                const enabled = 0 != (try r.readInt(u8, .little));
+                const enabled = 0 != (try r.takeInt(u8, .little));
                 try bareReadParams(r, &snapshots[i].params, 1);
                 @atomicStore(bool, &snapshots[i].enabled, enabled, .seq_cst);
             }
@@ -182,7 +185,7 @@ fn readSnapshots(r: std.io.AnyReader, snapshots: *[256]Snapshot, version: u16, l
             if (len != 75 * 256) return error.SnapshotsBadLength;
 
             for (0..256) |i| {
-                const enabled = 0 != (try r.readInt(u8, .little));
+                const enabled = 0 != (try r.takeInt(u8, .little));
                 try bareReadParams(r, &snapshots[i].params, 2);
                 @atomicStore(bool, &snapshots[i].enabled, enabled, .seq_cst);
             }
@@ -191,7 +194,7 @@ fn readSnapshots(r: std.io.AnyReader, snapshots: *[256]Snapshot, version: u16, l
     }
 }
 
-fn readParams(r: std.io.AnyReader, params: *Params, version: u16, len: u16) !void {
+fn readParams(r: *std.io.Reader, params: *Params, version: u16, len: u16) !void {
     switch (version) {
         1 => {
             if (len != 72) return error.BadParamLen;
@@ -205,12 +208,12 @@ fn readParams(r: std.io.AnyReader, params: *Params, version: u16, len: u16) !voi
     }
 }
 
-fn bareReadParams(r: std.io.AnyReader, params: *Params, version: u16) !void {
+fn bareReadParams(r: *std.io.Reader, params: *Params, version: u16) !void {
     // Engine (4)
-    params.engine.set(.bpm, try r.readInt(i16, .little));
-    params.engine.set(.drive, try r.readInt(u8, .little));
-    params.engine.set(.mutes, @bitCast(try r.readInt(u8, .little)));
-    params.engine.set(.swing, try r.readInt(u8, .little));
+    a.set(&params.engine, .bpm, try r.takeInt(i16, .little));
+    a.set(&params.engine, .drive, try r.takeInt(u8, .little));
+    a.set(&params.engine, .mutes, @bitCast(try r.takeInt(u8, .little)));
+    a.set(&params.engine, .swing, try r.takeInt(u8, .little));
 
     // Bass synths (28 +2 version2)
     switch (version) {
@@ -226,58 +229,58 @@ fn bareReadParams(r: std.io.AnyReader, params: *Params, version: u16) !void {
     }
 
     // Drums (33)
-    params.drums.set(.accent, try r.readInt(u8, .little));
+    a.set(&params.drums, .accent, try r.takeInt(u8, .little));
     var kitnamebuf: [2]u8 = undefined;
-    try r.readNoEof(&kitnamebuf);
+    try r.readSliceAll(&kitnamebuf);
     const kit = std.meta.stringToEnum(Kit.Id, &kitnamebuf) orelse return error.DrumKitBadId;
-    params.drums.set(.kit, kit);
-    params.drums.set(.duck_time, try r.readInt(u8, .little));
+    a.set(&params.drums, .kit, kit);
+    a.set(&params.drums, .duck_time, try r.takeInt(u8, .little));
 
     // Delay (36)
-    params.delay.set(.time, try r.readInt(u8, .little));
-    params.delay.set(.feedback, try r.readInt(u8, .little));
-    params.delay.set(.duck, try r.readInt(u8, .little));
+    a.set(&params.delay, .time, try r.takeInt(u8, .little));
+    a.set(&params.delay, .feedback, try r.takeInt(u8, .little));
+    a.set(&params.delay, .duck, try r.takeInt(u8, .little));
 
     // Mixer (72)
     for (0..Mixer.nchannels) |i| {
-        params.mixer[i].set(.level, try r.readInt(u8, .little));
-        params.mixer[i].set(.pan, try r.readInt(u8, .little));
-        params.mixer[i].set(.send, try r.readInt(u8, .little));
-        params.mixer[i].set(.duck, try r.readInt(u8, .little));
+        a.set(&params.mixer[i], .level, try r.takeInt(u8, .little));
+        a.set(&params.mixer[i], .pan, try r.takeInt(u8, .little));
+        a.set(&params.mixer[i], .send, try r.takeInt(u8, .little));
+        a.set(&params.mixer[i], .duck, try r.takeInt(u8, .little));
     }
 }
 
-fn readBassPatch1(r: std.io.AnyReader, params: *DigiBass.Params) !void {
-    params.set(.sound_type, .pd);
-    params.set(.timbre, try readFloat01(r));
-    params.set(.mod_depth, try readFloat01(r));
-    params.set(.res, try readFloat01(r));
-    params.set(.feedback, try readFloat01(r));
-    params.set(.decay, try readFloat01(r));
-    params.set(.accentness, try readFloat01(r));
+fn readBassPatch1(r: *std.io.Reader, params: *DigiBass.Params) !void {
+    a.set(params, .sound_type, .pd);
+    a.set(params, .timbre, try readFloat01(r));
+    a.set(params, .mod_depth, try readFloat01(r));
+    a.set(params, .res, try readFloat01(r));
+    a.set(params, .feedback, try readFloat01(r));
+    a.set(params, .decay, try readFloat01(r));
+    a.set(params, .accentness, try readFloat01(r));
 }
 
-fn readBassPatch2(r: std.io.AnyReader, params: *DigiBass.Params) !void {
-    params.set(.sound_type, @enumFromInt(try r.readInt(u8, .little)));
-    params.set(.timbre, try readFloat01(r));
-    params.set(.mod_depth, try readFloat01(r));
-    params.set(.res, try readFloat01(r));
-    params.set(.feedback, try readFloat01(r));
-    params.set(.decay, try readFloat01(r));
-    params.set(.accentness, try readFloat01(r));
+fn readBassPatch2(r: *std.io.Reader, params: *DigiBass.Params) !void {
+    a.set(params, .sound_type, @enumFromInt(try r.takeInt(u8, .little)));
+    a.set(params, .timbre, try readFloat01(r));
+    a.set(params, .mod_depth, try readFloat01(r));
+    a.set(params, .res, try readFloat01(r));
+    a.set(params, .feedback, try readFloat01(r));
+    a.set(params, .decay, try readFloat01(r));
+    a.set(params, .accentness, try readFloat01(r));
 }
 
-fn readMixerEditorState(r: std.io.AnyReader, mixer_editor: *MixerEditor, version: u16, len: u16) !void {
+fn readMixerEditorState(r: *std.io.Reader, mixer_editor: *MixerEditor, version: u16, len: u16) !void {
     switch (version) {
         1 => {
             if (len != 2) return error.MixerEditorStateBadLen;
 
-            const channel = try r.readInt(u8, .little);
+            const channel = try r.takeInt(u8, .little);
             if (channel >= Mixer.nchannels)
                 return error.MixerEditorStateBadChannel;
             mixer_editor.selected_channel = channel;
 
-            const row_ch = try r.readInt(u8, .little);
+            const row_ch = try r.takeInt(u8, .little);
             switch (row_ch) {
                 'l' => mixer_editor.selected_row = .lvl,
                 'p' => mixer_editor.selected_row = .pan,
@@ -290,13 +293,13 @@ fn readMixerEditorState(r: std.io.AnyReader, mixer_editor: *MixerEditor, version
     }
 }
 
-fn readArrangerState(r: std.io.AnyReader, arranger: *Arranger, version: u16, len: u16) !void {
+fn readArrangerState(r: *std.io.Reader, arranger: *Arranger, version: u16, len: u16) !void {
     switch (version) {
         1 => {
             if (len != 2) return error.ArrangerStateBadLen;
 
-            const column = try r.readInt(u8, .little);
-            const row = try r.readInt(u8, .little);
+            const column = try r.takeInt(u8, .little);
+            const row = try r.takeInt(u8, .little);
 
             if (column >= 3) return error.ArrangerStateColumnOutOfRange;
 
@@ -307,7 +310,7 @@ fn readArrangerState(r: std.io.AnyReader, arranger: *Arranger, version: u16, len
     }
 }
 
-fn readBassPatterns(r: std.io.AnyReader, patterns: *[256]BassPattern, version: u16, len: u16) !void {
+fn readBassPatterns(r: *std.io.Reader, patterns: *[256]BassPattern, version: u16, len: u16) !void {
     switch (version) {
         1 => {
             if (len != (2 + BassPattern.maxlen) * 255) return error.BassPatternsBadLen;
@@ -319,21 +322,21 @@ fn readBassPatterns(r: std.io.AnyReader, patterns: *[256]BassPattern, version: u
     }
 }
 
-fn readBassPattern(r: std.io.AnyReader, pattern: *BassPattern) !void {
-    const len = try r.readInt(u8, .little);
+fn readBassPattern(r: *std.io.Reader, pattern: *BassPattern) !void {
+    const len = try r.takeInt(u8, .little);
     if (len > BassPattern.maxlen) return error.BassPatternLenNotInRange;
     pattern.len = len;
 
-    const base = try r.readInt(u8, .little);
+    const base = try r.takeInt(u8, .little);
     if (base > 127) return error.BassPatternBaseNotInRange;
     pattern.base = @intCast(base);
 
     for (0..BassPattern.maxlen) |i| {
-        pattern.steps[i] = @bitCast(try r.readInt(u8, .little));
+        pattern.steps[i] = @bitCast(try r.takeInt(u8, .little));
     }
 }
 
-fn readDrumPatterns(r: std.io.AnyReader, patterns: *[256]DrumPattern, version: u16, len: u16) !void {
+fn readDrumPatterns(r: *std.io.Reader, patterns: *[256]DrumPattern, version: u16, len: u16) !void {
     switch (version) {
         1 => {
             if (len != (1 + 2 * DrumPattern.maxlen) * 255) return error.DrumPatternsBadLen;
@@ -347,125 +350,119 @@ fn readDrumPatterns(r: std.io.AnyReader, patterns: *[256]DrumPattern, version: u
     }
 }
 
-fn readDrumPattern(r: std.io.AnyReader, pattern: *DrumPattern) !void {
-    const len = try r.readInt(u8, .little);
+fn readDrumPattern(r: *std.io.Reader, pattern: *DrumPattern) !void {
+    const len = try r.takeInt(u8, .little);
     if (len > DrumPattern.maxlen) return error.DrumPatternLenNotInRange;
     pattern.len = len;
 
     for (0..DrumPattern.maxlen) |i| {
-        const step_int = try r.readInt(u16, .little);
+        const step_int = try r.takeInt(u16, .little);
         pattern.steps[i] = @bitCast(step_int);
     }
 }
 
-fn readDrumPattern2(r: std.io.AnyReader, pattern: *DrumPattern) !void {
-    const len = try r.readInt(u8, .little);
+fn readDrumPattern2(r: *std.io.Reader, pattern: *DrumPattern) !void {
+    const len = try r.takeInt(u8, .little);
     if (len > DrumPattern.maxlen) return error.DrumPatternLenNotInRange;
     pattern.len = len;
 
     var kitnamebuf: [2]u8 = undefined;
-    try r.readNoEof(&kitnamebuf);
+    try r.readSliceAll(&kitnamebuf);
     const kit = std.meta.stringToEnum(Kit.Id, &kitnamebuf) orelse return error.DrumPatternBadKit;
 
     _ = kit;
 
     for (0..DrumPattern.maxlen) |i| {
-        const step_int = try r.readInt(u16, .little);
+        const step_int = try r.takeInt(u16, .little);
         pattern.steps[i] = @bitCast(step_int);
     }
 }
 
-fn readFloat01(r: std.io.AnyReader) !f32 {
-    return @as(f32, @floatFromInt(try r.readInt(u16, .little))) / 0xffff;
+fn readFloat01(r: *std.io.Reader) !f32 {
+    return @as(f32, @floatFromInt(try r.takeInt(u16, .little))) / 0xffff;
 }
 
-fn readArr(r: std.io.AnyReader, arr: *[256]u8, version: u16, len: u16) !void {
+fn readArr(r: *std.io.Reader, arr: *[256]u8, version: u16, len: u16) !void {
     switch (version) {
         1 => {
             if (len != 256) return error.ArrBadLen;
-            try r.readNoEof(arr);
+            try r.readSliceAll(arr);
         },
         else => return error.ArrUnknownVersion,
     }
 }
 
-pub fn saveWriter(w: std.io.AnyWriter, s: State) !void {
-    var handle = beginChunk(.ARR1, 1);
+pub fn saveWriter(w: *std.io.Writer, s: State) !void {
     {
-        const hw = handle.w.writer().any();
+        var handle = beginChunk(.ARR1, 1);
         for (0..256) |i| {
-            try hw.writeInt(u8, @atomicLoad(u8, &s.arr1[i], .seq_cst), .little);
+            try handle.w.writeInt(u8, @atomicLoad(u8, &s.arr1[i], .seq_cst), .little);
         }
+        try handle.finalize(w);
     }
-    try handle.finalize(w);
 
-    handle = beginChunk(.ARR2, 1);
     {
-        const hw = handle.w.writer().any();
+        var handle = beginChunk(.ARR2, 1);
         for (0..256) |i| {
-            try hw.writeInt(u8, @atomicLoad(u8, &s.arr2[i], .seq_cst), .little);
+            try handle.w.writeInt(u8, @atomicLoad(u8, &s.arr2[i], .seq_cst), .little);
         }
+        try handle.finalize(w);
     }
-    try handle.finalize(w);
 
-    handle = beginChunk(.ARR3, 1);
     {
-        const hw = handle.w.writer().any();
+        var handle = beginChunk(.ARR3, 1);
         for (0..256) |i| {
-            try hw.writeInt(u8, @atomicLoad(u8, &s.arr3[i], .seq_cst), .little);
+            try handle.w.writeInt(u8, @atomicLoad(u8, &s.arr3[i], .seq_cst), .little);
         }
+        try handle.finalize(w);
     }
-    try handle.finalize(w);
 
-    handle = beginChunk(.BPAT, 1);
     {
-        const hw = handle.w.writer().any();
+        var handle = beginChunk(.BPAT, 1);
         for (0..255) |i| {
             const pat = &s.bpat.*[i];
 
-            try hw.writeInt(u8, pat.length(), .little);
-            try hw.writeInt(u8, pat.getBase(), .little);
+            try handle.w.writeInt(u8, pat.length(), .little);
+            try handle.w.writeInt(u8, pat.getBase(), .little);
 
             for (0..BassPattern.maxlen) |j| {
-                try hw.writeInt(u8, @bitCast(pat.steps[j].copy()), .little);
+                try handle.w.writeInt(u8, @bitCast(pat.steps[j].copy()), .little);
             }
         }
+        try handle.finalize(w);
     }
-    try handle.finalize(w);
 
-    handle = beginChunk(.DPAT, 1);
     {
-        const hw = handle.w.writer().any();
+        var handle = beginChunk(.DPAT, 1);
         for (0..255) |i| {
             const pat = &s.dpat.*[i];
 
-            try hw.writeInt(u8, pat.length(), .little);
+            try handle.w.writeInt(u8, pat.length(), .little);
 
             for (0..DrumPattern.maxlen) |j| {
                 const step_int: u16 = @bitCast(pat.steps[j].copy());
-                try hw.writeInt(u16, step_int, .little);
+                try handle.w.writeInt(u16, step_int, .little);
             }
         }
+        try handle.finalize(w);
     }
-    try handle.finalize(w);
 
-    handle = beginChunk(.PARM, 2);
-    try writeParams(handle.w.writer().any(), s.params);
-    try handle.finalize(w);
-
-    handle = beginChunk(.ARRS, 1);
     {
-        const hw = handle.w.writer().any();
-        try hw.writeInt(u8, s.arranger.column, .little);
-        try hw.writeInt(u8, s.arranger.row, .little);
+        var handle = beginChunk(.PARM, 2);
+        try writeParams(&handle.w, s.params);
+        try handle.finalize(w);
     }
-    try handle.finalize(w);
 
-    handle = beginChunk(.MXED, 1);
     {
-        const hw = handle.w.writer().any();
+        var handle = beginChunk(.ARRS, 1);
+        try handle.w.writeInt(u8, s.arranger.column, .little);
+        try handle.w.writeInt(u8, s.arranger.row, .little);
+        try handle.finalize(w);
+    }
 
-        try hw.writeInt(u8, s.mixer_editor.selected_channel, .little);
+    {
+        var handle = beginChunk(.MXED, 1);
+        try handle.w.writeInt(u8, s.mixer_editor.selected_channel, .little);
 
         const row_ch: u8 = switch (s.mixer_editor.selected_row) {
             .lvl => 'l',
@@ -473,64 +470,62 @@ pub fn saveWriter(w: std.io.AnyWriter, s: State) !void {
             .snd => 's',
             .dck => 'd',
         };
-        try hw.writeInt(u8, row_ch, .little);
+        try handle.w.writeInt(u8, row_ch, .little);
+        try handle.finalize(w);
     }
-    try handle.finalize(w);
 
-    handle = beginChunk(.SNAP, 2);
     {
-        const hw = handle.w.writer().any();
-
+        var handle = beginChunk(.SNAP, 2);
         for (0..256) |i| {
             const snap_idx = @atomicLoad(u8, &s.snap_map[i], .seq_cst);
-            try hw.writeInt(u8, if (s.snapshots[snap_idx].active()) 1 else 0, .little);
-            try writeParams(hw, &s.snapshots[snap_idx].params);
+            try handle.w.writeInt(u8, if (s.snapshots[snap_idx].active()) 1 else 0, .little);
+            try writeParams(&handle.w, &s.snapshots[snap_idx].params);
         }
+        try handle.finalize(w);
     }
-    try handle.finalize(w);
 }
 
-fn writeParams(w: std.io.AnyWriter, params: *const Params) !void {
+fn writeParams(w: *std.io.Writer, params: *const Params) !void {
     // engine
-    try w.writeInt(i16, params.engine.get(.bpm), .little);
-    try w.writeInt(u8, params.engine.get(.drive), .little);
-    try w.writeInt(u8, @bitCast(params.engine.get(.mutes)), .little);
-    try w.writeInt(u8, params.engine.get(.swing), .little);
+    try w.writeInt(i16, a.get(&params.engine, .bpm), .little);
+    try w.writeInt(u8, a.get(&params.engine, .drive), .little);
+    try w.writeInt(u8, @bitCast(a.get(&params.engine, .mutes)), .little);
+    try w.writeInt(u8, a.get(&params.engine, .swing), .little);
 
     // Bass synths
     try writeBassParams(w, &params.bass1);
     try writeBassParams(w, &params.bass2);
 
     // Drums
-    try w.writeInt(u8, params.drums.get(.accent), .little);
-    try w.writeAll(@tagName(params.drums.get(.kit)));
-    try w.writeInt(u8, params.drums.get(.duck_time), .little);
+    try w.writeInt(u8, a.get(&params.drums, .accent), .little);
+    try w.writeAll(@tagName(a.get(&params.drums, .kit)));
+    try w.writeInt(u8, a.get(&params.drums, .duck_time), .little);
 
     // Delay
-    try w.writeInt(u8, params.delay.get(.time), .little);
-    try w.writeInt(u8, params.delay.get(.feedback), .little);
-    try w.writeInt(u8, params.delay.get(.duck), .little);
+    try w.writeInt(u8, a.get(&params.delay, .time), .little);
+    try w.writeInt(u8, a.get(&params.delay, .feedback), .little);
+    try w.writeInt(u8, a.get(&params.delay, .duck), .little);
 
     // Mixer
     for (0..Mixer.nchannels) |i| {
-        try w.writeInt(u8, params.mixer[i].get(.level), .little);
-        try w.writeInt(u8, params.mixer[i].get(.pan), .little);
-        try w.writeInt(u8, params.mixer[i].get(.send), .little);
-        try w.writeInt(u8, params.mixer[i].get(.duck), .little);
+        try w.writeInt(u8, a.get(&params.mixer[i], .level), .little);
+        try w.writeInt(u8, a.get(&params.mixer[i], .pan), .little);
+        try w.writeInt(u8, a.get(&params.mixer[i], .send), .little);
+        try w.writeInt(u8, a.get(&params.mixer[i], .duck), .little);
     }
 }
 
-fn writeBassParams(w: std.io.AnyWriter, params: *const DigiBass.Params) !void {
-    try w.writeInt(u8, @intFromEnum(params.get(.sound_type)), .little);
-    try writeParam01(w, params.get(.timbre));
-    try writeParam01(w, params.get(.mod_depth));
-    try writeParam01(w, params.get(.res));
-    try writeParam01(w, params.get(.feedback));
-    try writeParam01(w, params.get(.decay));
-    try writeParam01(w, params.get(.accentness));
+fn writeBassParams(w: *std.io.Writer, params: *const DigiBass.Params) !void {
+    try w.writeInt(u8, @intFromEnum(a.get(params, .sound_type)), .little);
+    try writeParam01(w, a.get(params, .timbre));
+    try writeParam01(w, a.get(params, .mod_depth));
+    try writeParam01(w, a.get(params, .res));
+    try writeParam01(w, a.get(params, .feedback));
+    try writeParam01(w, a.get(params, .decay));
+    try writeParam01(w, a.get(params, .accentness));
 }
 
-fn writeParam01(w: std.io.AnyWriter, val: f32) !void {
+fn writeParam01(w: *std.io.Writer, val: f32) !void {
     const capped: f32 = 0xffff * @min(1, @max(0, val));
     const int: u16 = @intFromFloat(@round(capped));
 

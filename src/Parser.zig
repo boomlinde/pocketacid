@@ -1,4 +1,4 @@
-// Copyright (C) 2025  Philip Linde
+// Copyright (C) 2025-2026  Philip Linde
 //
 // This file is part of Pocket Acid.
 //
@@ -30,7 +30,7 @@ pub fn expectWithStringAllocator(self: Parser, comptime T: type, string_allocato
     return self.innerExpect(T, string_allocator);
 }
 
-pub fn serialize(d: anytype, w: std.io.AnyWriter) !void {
+pub fn serialize(d: anytype, w: *std.io.Writer) !void {
     const T = @TypeOf(d);
     switch (@typeInfo(T)) {
         .int => try w.print("{} ", .{d}),
@@ -148,10 +148,10 @@ test Parser {
         } = .{},
         x: [3]i8 = .{ 4, 5, 6 },
     };
-    var r = testStream(teststr);
+    var r = std.io.Reader.fixed(teststr);
     var tokenbuf: [100]u8 = undefined;
     var tokenizer = Tokenizer{
-        .reader = r.reader().any(),
+        .reader = &r,
         .buf = &tokenbuf,
     };
     const parser = Parser{ .tokenizer = &tokenizer };
@@ -165,12 +165,8 @@ test Parser {
 
     // Serialize
     var wrbuf: [256]u8 = undefined;
-    var w = std.io.FixedBufferStream([]u8){ .buffer = &wrbuf, .pos = 0 };
-    try serialize(v, w.writer().any());
-    const out = wrbuf[0..w.pos];
+    var w = std.io.Writer.fixed(&wrbuf);
+    try serialize(v, &w);
+    const out = wrbuf[0..w.end];
     try t.expectEqualStrings(teststr, out);
-}
-
-fn testStream(str: []const u8) std.io.FixedBufferStream([]const u8) {
-    return std.io.FixedBufferStream([]const u8){ .buffer = str, .pos = 0 };
 }
