@@ -1,4 +1,4 @@
-// Copyright (C) 2025  Philip Linde
+// Copyright (C) 2025-2026  Philip Linde
 //
 // This file is part of Pocket Acid.
 //
@@ -38,6 +38,7 @@ pub const Id = enum(u7) {
     R8,
     R9,
     N1,
+    AN,
 
     pub fn resolve(self: Id) *const Kit {
         return switch (self) {
@@ -46,6 +47,7 @@ pub const Id = enum(u7) {
             .R8 => &R8,
             .R9 => &R9,
             .N1 => &N1,
+            .AN => &AN,
         };
     }
 
@@ -56,6 +58,8 @@ pub const Id = enum(u7) {
 
 const rs808 = @embedFile("assets/samples/rs808.raw");
 const cp808 = @embedFile("assets/samples/cp808.raw");
+const ht606 = @embedFile("assets/samples/hi606.raw");
+const lt606 = @embedFile("assets/samples/lo606.raw");
 pub const R6 = Kit{
     .bd = @embedFile("assets/samples/bd606.raw"),
     .ch = @embedFile("assets/samples/ch606.raw"),
@@ -123,4 +127,18 @@ pub const N1 = Kit{
     .xx = @embedFile("assets/samples/ns_xx.raw"),
     .yy = @embedFile("assets/samples/ns_yy.raw"),
     .choh = n1_oh,
+};
+
+const an_ch = @embedFile("assets/samples/andreya-hat1.raw");
+pub const AN = Kit{
+    .bd = @embedFile("assets/samples/andreya-kick1.raw"),
+    .ch = an_ch,
+    .oh = @embedFile("assets/samples/andreya-hat2.raw"),
+    .cy = @embedFile("assets/samples/andreya-cym1.raw"),
+    .ht = ht606,
+    .lt = lt606,
+    .sd = @embedFile("assets/samples/andreya-snare.raw"),
+    .xx = @embedFile("assets/samples/andreya-rim.raw"),
+    .yy = cp808,
+    .choh = an_ch,
 };

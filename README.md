@@ -579,6 +579,7 @@ This project uses resources from multiple authors:
 * The [Zig](https://ziglang.org/) standard library. The Zig license (MIT) is
   retrieved upon building and is included in the release archives.
 * [Salkinitzor](https://salkinitzor.bandcamp.com/) made the N1 drum kit sounds
+* [Andreya](https://soundcloud.com/aliv_music/) made the AN drum kit sounds
 * [Ess](https://github.com/ess-m) made the OS X build script
 
 ## Copyright and license
