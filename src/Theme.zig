@@ -39,6 +39,7 @@ pub const Id = enum {
     panel,
     forest,
     papaya,
+    sun,
 
     pub fn resolve(self: Id) *const Theme {
         return switch (self) {
@@ -46,6 +47,7 @@ pub const Id = enum {
             .panel => &panel,
             .forest => &forest,
             .papaya => &papaya,
+            .sun => &sun,
         };
     }
 
@@ -88,6 +90,14 @@ const papaya = theme(.{
     .normal = RGB.init(0x22, 0x44, 0x66),
     .playing = RGB.init(192, 192, 0),
     .hilight = RGB.init(0x66, 0x22, 0x44),
+});
+
+const sun = theme(.{
+    .bg = RGB.init(0xff, 0xff, 0xff),
+    .hilight2 = RGB.init(0x00, 0x00, 0x80),
+    .normal = RGB.init(0x00, 0x00, 0x00),
+    .playing = RGB.init(0x00, 0x80, 0x80),
+    .hilight = RGB.init(0x80, 0x00, 0x00),
 });
 
 fn theme(th: InnerTheme) Theme {
