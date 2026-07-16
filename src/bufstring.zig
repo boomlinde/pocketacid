@@ -27,6 +27,7 @@ pub fn BufString(comptime size: usize) type {
         }
 
         pub fn set(self: *@This(), str: []const u8) !void {
+            if (str.len > size) return error.StringTooLong;
             std.mem.copyForwards(u8, &self.buf, str);
             self.len = @intCast(str.len);
         }

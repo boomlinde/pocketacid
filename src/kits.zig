@@ -29,10 +29,6 @@ pub const Slot = struct {
 var kits: [256]Slot = undefined;
 var n: usize = 0;
 
-pub fn reset() void {
-    n = 0;
-}
-
 pub fn register(name: []const u8, kit: Kit) !void {
     if (n == kits.len) return error.TooManyKits;
 
@@ -63,4 +59,21 @@ pub fn idx(name: []const u8) !usize {
     }
 
     return error.NoSuchKit;
+}
+
+pub fn load(a: std.mem.Allocator, dir: std.fs.Dir) !void {
+    const suffix = ".pkit";
+    var iter = dir.iterate();
+
+    while (try iter.next()) |entry| {
+        switch (entry.kind) {
+            .file, .sym_link => {
+                if (!std.mem.endsWith(u8, entry.name, suffix)) continue;
+                const content = try dir.readFileAlloc(a, entry.name, 1 * 1024 * 1024);
+                const label = entry.name[0 .. entry.name.len - suffix.len];
+                try register(label, try Kit.parse(content));
+            },
+            else => continue,
+        }
+    }
 }

@@ -110,13 +110,15 @@ pub fn main() !void {
     try ProjectPicker.migrate(savedir);
 
     // Parse internal kits
-    kits.reset();
     try kits.register("R6", try Kit.parse(@embedFile("assets/kits/R6.pkit")));
     try kits.register("R7", try Kit.parse(@embedFile("assets/kits/R7.pkit")));
     try kits.register("R8", try Kit.parse(@embedFile("assets/kits/R8.pkit")));
     try kits.register("R9", try Kit.parse(@embedFile("assets/kits/R9.pkit")));
     try kits.register("N1", try Kit.parse(@embedFile("assets/kits/N1.pkit")));
     try kits.register("AN", try Kit.parse(@embedFile("assets/kits/AN.pkit")));
+
+    // Load external kits
+    try kits.load(arena.allocator(), savedir);
 
     // Start controller manager
     var cm = ControllerManager{};
