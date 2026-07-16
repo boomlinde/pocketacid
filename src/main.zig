@@ -41,6 +41,8 @@ const Params = @import("Params.zig");
 const Config = @import("Config.zig");
 const InputState = @import("ButtonHandler.zig").States;
 const ProjectPicker = @import("ProjectPicker.zig");
+const Kit = @import("Kit.zig");
+const kits = @import("kits.zig");
 const a = @import("access.zig");
 
 const io = @import("io.zig");
@@ -106,6 +108,15 @@ pub fn main() !void {
 
     // Migrate old savefile
     try ProjectPicker.migrate(savedir);
+
+    // Parse internal kits
+    kits.reset();
+    try kits.register("R6", try Kit.parse(@embedFile("assets/kits/R6.pkit")));
+    try kits.register("R7", try Kit.parse(@embedFile("assets/kits/R7.pkit")));
+    try kits.register("R8", try Kit.parse(@embedFile("assets/kits/R8.pkit")));
+    try kits.register("R9", try Kit.parse(@embedFile("assets/kits/R9.pkit")));
+    try kits.register("N1", try Kit.parse(@embedFile("assets/kits/N1.pkit")));
+    try kits.register("AN", try Kit.parse(@embedFile("assets/kits/AN.pkit")));
 
     // Start controller manager
     var cm = ControllerManager{};

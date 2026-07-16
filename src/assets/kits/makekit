@@ -1,0 +1,31 @@
+#!/bin/env python
+
+import sys, struct
+
+ACCEPTABLE = "bd sd ch oh oc lt ht cy xx yy".split()
+
+samples = {}
+for filename in sys.argv[1:]:
+    with open(filename, 'rb') as f:
+        samples[filename.rsplit(".", 1)[0].split("/")[-1]] = f.read()
+
+for slot in ACCEPTABLE:
+    if slot not in samples:
+        print(f"Missing slot {slot}", file=sys.stderr)
+        sys.exit(1)
+
+for slot in samples:
+    if slot not in ACCEPTABLE:
+        print(f"Unknown slot {slot}", file=sys.stderr)
+        sys.exit(1)
+
+sys.stdout.buffer.write(bytes("PKIT", "ascii"))
+
+for slot in ACCEPTABLE:
+    sample = samples[slot]
+
+    sys.stdout.buffer.write(bytes(slot, "ascii"))
+    sys.stdout.buffer.write(struct.pack("<i", len(sample)))
+    sys.stdout.buffer.write(sample)
+
+sys.stdout.flush()

@@ -25,11 +25,12 @@ const Attrib = @import("CharDisplay.zig").Attrib;
 const FontType = @import("CharDisplay.zig").FontType;
 const Kit = @import("Kit.zig");
 const Theme = @import("Theme.zig");
+const kits = @import("kits.zig");
 
 pub const Entry = union(enum) {
     u8: U8Entry,
     bool: BoolEntry,
-    Kit: EnumEntry(Kit.Id),
+    Kit: KitEntry,
     Theme: EnumEntry(Theme.Id),
     FontType: EnumEntry(FontType),
     BassType: EnumEntry(DigiBass.Params.Type),
@@ -247,3 +248,23 @@ pub fn EnumEntry(comptime E: type) type {
         }
     };
 }
+
+const KitEntry = struct {
+    label: []const u8,
+    ptr: *usize,
+
+    fn display(self: KitEntry, tm: *TextMatrix, x: usize, y: usize, color: Attrib) void {
+        const value = @atomicLoad(usize, self.ptr, .seq_cst);
+        tm.print(x, y, color, "{s} {s}", .{ self.label, kits.get(value).name.slice() });
+    }
+
+    fn left(self: *const KitEntry) void {
+        const value = @atomicLoad(usize, self.ptr, .seq_cst);
+        @atomicStore(usize, self.ptr, kits.prev(value), .seq_cst);
+    }
+
+    fn right(self: *const KitEntry) void {
+        const value = @atomicLoad(usize, self.ptr, .seq_cst);
+        @atomicStore(usize, self.ptr, kits.next(value), .seq_cst);
+    }
+};

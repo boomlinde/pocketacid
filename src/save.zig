@@ -31,6 +31,7 @@ const Params = @import("Params.zig");
 const Snapshot = @import("Snapshot.zig");
 const io = @import("io.zig");
 const a = @import("access.zig");
+const kits = @import("kits.zig");
 
 var chunkbuf: [0xffff]u8 = undefined;
 
@@ -232,7 +233,8 @@ fn bareReadParams(r: *std.io.Reader, params: *Params, version: u16) !void {
     a.set(&params.drums, .accent, try r.takeInt(u8, .little));
     var kitnamebuf: [2]u8 = undefined;
     try r.readSliceAll(&kitnamebuf);
-    const kit = std.meta.stringToEnum(Kit.Id, &kitnamebuf) orelse return error.DrumKitBadId;
+
+    const kit = try kits.idx(&kitnamebuf);
     a.set(&params.drums, .kit, kit);
     a.set(&params.drums, .duck_time, try r.takeInt(u8, .little));
 
@@ -366,11 +368,9 @@ fn readDrumPattern2(r: *std.io.Reader, pattern: *DrumPattern) !void {
     if (len > DrumPattern.maxlen) return error.DrumPatternLenNotInRange;
     pattern.len = len;
 
+    // TODO: get rid of this. Drum patterns shouldn't have kits
     var kitnamebuf: [2]u8 = undefined;
     try r.readSliceAll(&kitnamebuf);
-    const kit = std.meta.stringToEnum(Kit.Id, &kitnamebuf) orelse return error.DrumPatternBadKit;
-
-    _ = kit;
 
     for (0..DrumPattern.maxlen) |i| {
         const step_int = try r.takeInt(u16, .little);
@@ -498,7 +498,8 @@ fn writeParams(w: *std.io.Writer, params: *const Params) !void {
 
     // Drums
     try w.writeInt(u8, a.get(&params.drums, .accent), .little);
-    try w.writeAll(@tagName(a.get(&params.drums, .kit)));
+    const kitslot = kits.get(a.get(&params.drums, .kit));
+    try w.writeAll(kitslot.name.slice());
     try w.writeInt(u8, a.get(&params.drums, .duck_time), .little);
 
     // Delay

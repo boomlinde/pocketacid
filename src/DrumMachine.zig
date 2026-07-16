@@ -24,6 +24,7 @@ const a = @import("access.zig");
 const Ducker = @import("Ducker.zig");
 const TextMatrix = @import("TextMatrix.zig");
 const Theme = @import("Theme.zig");
+const kits = @import("kits.zig");
 
 pub const Mutes = packed struct(u8) {
     pub const Group = enum { bd, sd, hhcy, tm, b1, b2, rscp };
@@ -79,7 +80,7 @@ pub const Mutes = packed struct(u8) {
 };
 pub const Params = struct {
     accent: u8 = 0x40,
-    kit: Kit.Id = .R6,
+    kit: usize = 0,
     duck_time: u8 = 0x20,
 };
 
@@ -125,7 +126,7 @@ pub fn handleMidiEvent(self: *DrumMachine, event: midi.Event) void {
             const tmm = self.mutes.get(.tm);
             const rscpm = self.mutes.get(.rscp);
 
-            const kit = a.get(self.params, .kit).resolve();
+            const kit = &kits.get(a.get(self.params, .kit)).kit;
 
             switch (e.pitch) {
                 0 => if (!bdm) {
