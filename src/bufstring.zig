@@ -20,7 +20,7 @@ const std = @import("std");
 pub fn BufString(comptime size: usize) type {
     return struct {
         len: std.math.IntFittingRange(0, size) = 0,
-        buf: [size]u8 = undefined,
+        buf: [size]u8 = [1]u8{0} ** size,
 
         pub fn slice(self: *const @This()) []const u8 {
             return self.buf[0..self.len];

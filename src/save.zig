@@ -191,6 +191,15 @@ fn readSnapshots(r: *std.io.Reader, snapshots: *[256]Snapshot, version: u16, len
                 @atomicStore(bool, &snapshots[i].enabled, enabled, .seq_cst);
             }
         },
+        3 => {
+            if (len != 82 * 256) return error.SnapshotsBadLength;
+
+            for (0..256) |i| {
+                const enabled = 0 != (try r.takeInt(u8, .little));
+                try bareReadParams(r, &snapshots[i].params, 3);
+                @atomicStore(bool, &snapshots[i].enabled, enabled, .seq_cst);
+            }
+        },
         else => return error.SnapshotsBadVersion,
     }
 }
@@ -204,6 +213,10 @@ fn readParams(r: *std.io.Reader, params: *Params, version: u16, len: u16) !void 
         2 => {
             if (len != 74) return error.BadParamLen;
             try bareReadParams(r, params, 2);
+        },
+        3 => {
+            if (len != 81) return error.BadParamLen;
+            try bareReadParams(r, params, 3);
         },
         else => return error.BadParamVersion,
     }
@@ -222,20 +235,33 @@ fn bareReadParams(r: *std.io.Reader, params: *Params, version: u16) !void {
             try readBassPatch1(r, &params.bass1);
             try readBassPatch1(r, &params.bass2);
         },
-        2 => {
+        2, 3 => {
             try readBassPatch2(r, &params.bass1);
             try readBassPatch2(r, &params.bass2);
         },
         else => return error.UnsupportedVersion,
     }
 
-    // Drums (33)
+    // Drums
     a.set(&params.drums, .accent, try r.takeInt(u8, .little));
-    var kitnamebuf: [2]u8 = undefined;
-    try r.readSliceAll(&kitnamebuf);
 
-    const kit = try kits.idx(&kitnamebuf);
-    a.set(&params.drums, .kit, kit);
+    switch (version) {
+        1, 2 => {
+            var kitnamebuf: [2]u8 = undefined;
+            try r.readSliceAll(&kitnamebuf);
+            const kit = try kits.idx(&kitnamebuf);
+            a.set(&params.drums, .kit, kit);
+        },
+        3 => {
+            const len = try r.takeInt(u8, .little);
+            var kitnamebuf: [kits.MAX_NAME_LEN]u8 = undefined;
+            try r.readSliceAll(&kitnamebuf);
+            const kit = try kits.idx(kitnamebuf[0..len]);
+            a.set(&params.drums, .kit, kit);
+        },
+        else => return error.UnsupportedVersion,
+    }
+
     a.set(&params.drums, .duck_time, try r.takeInt(u8, .little));
 
     // Delay (36)
@@ -448,7 +474,7 @@ pub fn saveWriter(w: *std.io.Writer, s: State) !void {
     }
 
     {
-        var handle = beginChunk(.PARM, 2);
+        var handle = beginChunk(.PARM, 3);
         try writeParams(&handle.w, s.params);
         try handle.finalize(w);
     }
@@ -475,7 +501,7 @@ pub fn saveWriter(w: *std.io.Writer, s: State) !void {
     }
 
     {
-        var handle = beginChunk(.SNAP, 2);
+        var handle = beginChunk(.SNAP, 3);
         for (0..256) |i| {
             const snap_idx = @atomicLoad(u8, &s.snap_map[i], .seq_cst);
             try handle.w.writeInt(u8, if (s.snapshots[snap_idx].active()) 1 else 0, .little);
@@ -499,7 +525,8 @@ fn writeParams(w: *std.io.Writer, params: *const Params) !void {
     // Drums
     try w.writeInt(u8, a.get(&params.drums, .accent), .little);
     const kitslot = kits.get(a.get(&params.drums, .kit));
-    try w.writeAll(kitslot.name.slice());
+    try w.writeInt(u8, kitslot.name.len, .little);
+    try w.writeAll(&kitslot.name.buf);
     try w.writeInt(u8, a.get(&params.drums, .duck_time), .little);
 
     // Delay

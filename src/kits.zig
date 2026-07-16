@@ -19,8 +19,10 @@ const std = @import("std");
 const Kit = @import("Kit.zig");
 const BufString = @import("bufstring.zig").BufString;
 
+pub const MAX_NAME_LEN = 8;
+
 pub const Slot = struct {
-    name: BufString(8) = .{},
+    name: BufString(MAX_NAME_LEN) = .{},
     kit: Kit = undefined,
 };
 

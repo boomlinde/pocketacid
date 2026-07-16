@@ -28,6 +28,7 @@ pub fn upload(self: *@This(), params: *const Params) void {
 
 pub fn delete(self: *@This()) void {
     @atomicStore(bool, &self.enabled, false, .seq_cst);
+    @atomicStore(usize, &self.params.drums.kit, 0, .seq_cst);
 }
 
 pub fn active(self: *const @This()) bool {
