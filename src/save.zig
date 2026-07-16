@@ -370,10 +370,6 @@ fn readDrumPatterns(r: *std.io.Reader, patterns: *[256]DrumPattern, version: u16
             if (len != (1 + 2 * DrumPattern.maxlen) * 255) return error.DrumPatternsBadLen;
             for (0..255) |i| try readDrumPattern(r, &patterns.*[i]);
         },
-        2 => {
-            if (len != (1 + 2 + 2 * DrumPattern.maxlen) * 255) return error.DrumPatternsBadLen;
-            for (0..255) |i| try readDrumPattern2(r, &patterns.*[i]);
-        },
         else => return error.DrumPatternsBadVersion,
     }
 }
@@ -382,21 +378,6 @@ fn readDrumPattern(r: *std.io.Reader, pattern: *DrumPattern) !void {
     const len = try r.takeInt(u8, .little);
     if (len > DrumPattern.maxlen) return error.DrumPatternLenNotInRange;
     pattern.len = len;
-
-    for (0..DrumPattern.maxlen) |i| {
-        const step_int = try r.takeInt(u16, .little);
-        pattern.steps[i] = @bitCast(step_int);
-    }
-}
-
-fn readDrumPattern2(r: *std.io.Reader, pattern: *DrumPattern) !void {
-    const len = try r.takeInt(u8, .little);
-    if (len > DrumPattern.maxlen) return error.DrumPatternLenNotInRange;
-    pattern.len = len;
-
-    // TODO: get rid of this. Drum patterns shouldn't have kits
-    var kitnamebuf: [2]u8 = undefined;
-    try r.readSliceAll(&kitnamebuf);
 
     for (0..DrumPattern.maxlen) |i| {
         const step_int = try r.takeInt(u16, .little);
