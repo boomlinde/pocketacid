@@ -2,7 +2,7 @@
 
 import sys, struct
 
-ACCEPTABLE = "bd sd ch oh oc lt ht cy xx yy".split()
+ACCEPTABLE = "bd sd ch oh oc lt ht cy rs cp".split()
 
 samples = {}
 for filename in sys.argv[1:]:

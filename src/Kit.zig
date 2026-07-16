@@ -111,14 +111,14 @@ pub fn parse(src: []const u8) !Kit {
             continue;
         }
 
-        if (eql(u8, slot, "xx")) {
+        if (eql(u8, slot, "xx") or eql(u8, slot, "rs")) {
             xx = true;
             const len = try r.takeInt(u32, .little);
             out.xx = try r.take(len);
             continue;
         }
 
-        if (eql(u8, slot, "yy")) {
+        if (eql(u8, slot, "yy") or eql(u8, slot, "cp")) {
             yy = true;
             const len = try r.takeInt(u32, .little);
             out.yy = try r.take(len);
