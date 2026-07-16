@@ -69,7 +69,7 @@ pub fn load(a: std.mem.Allocator, dir: std.fs.Dir) !void {
         switch (entry.kind) {
             .file, .sym_link => {
                 if (!std.mem.endsWith(u8, entry.name, suffix)) continue;
-                const content = try dir.readFileAlloc(a, entry.name, 1 * 1024 * 1024);
+                const content = try dir.readFileAlloc(a, entry.name, 4 * 1024 * 1024);
                 const label = entry.name[0 .. entry.name.len - suffix.len];
                 try register(label, try Kit.parse(content));
             },
