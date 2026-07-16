@@ -565,6 +565,38 @@ If a savedir is not supplied, a default location appropriate for the OS
 will be used (via [`SDL_GetPrefPath`](https://wiki.libsdl.org/SDL2/SDL_GetPrefPath)).
 This is where the configuration and project files will be saved.
 
+## Custom drum kits
+
+Pocket Acid now supports loading custom drum kits dynamically. The drum kits
+must be placed in your savedir alongside your save files. Their names must be
+no longer than 8 characters (ASCII) plus the extension ".pkit".
+
+You can create drum kits in two ways:
+
+* Using the browser-based tool available at `kit.html` or
+  [on my website](https://text.garden/kit.html).
+* Using the script at `src/assets/kits/makekit`. The script expects as its
+  arguments a set of raw samples encoded as 32 kHz little-endian signed
+  16-bit samples named according to sample slots (bd, sd, ch, oh,
+  oc (open+closed), lt, ht, cy, rs, cp) and emits the resulting kit to
+  `stdout`.
+
+Each individual kit must not exceed 4 MiB in size or Pocket Acid will fail to
+load it.
+
+### Drum kit format
+
+    +0 "PKIT"
+    +4 Multiple entries
+        +0 (2 characters) slot name (e.g. "bd")
+        +2 (u32le) sample length (in bytes)
+        +6 (<sample length> bytes) sample data
+
+    The kit must contain entries for these slots:
+    bd, sd, ch, oh, oc, lt, ht, cy, rs, cp
+
+    It must contain no other entries.
+
 ## Acknowledgement
 
 This project uses resources from multiple authors:
