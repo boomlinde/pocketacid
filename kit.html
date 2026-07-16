@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<head>
+	<title>Pocket Acid Kit Generator</title>
+</head>
+<body>
+<pre>
++---------------------------+
+| Pocket Acid Kit Generator |
++---------------------------+
+</pre>
+<input id="uploaded" type="file" multiple>
+<pre id="result"></pre>
+
+<pre>
+Select your original samples above. If they aren't already, they will
+be resampled to 32 kHz. Samples are matched to kit slots based on
+filenames.
+
+Files with the following filenames must be provided:
+
+- bd: bass drum
+- sd: snare drum
+- ch: closed hi-hat
+- oh: open hi-hat
+- oc: open+closed hi-hat
+- lt: low tom
+- ht: high tom
+- cy: cymbal
+- rs: rimshot
+- cp: clap
+
+The file extensions don't matter and the file can be of any format
+supported by your browser.
+
+You can of course assign whichever function you prefer to a sample
+slot, but those are the labels displayed in Pocket Acid. Note the
+special behavior of hi-hat sounds. ch, oh and oc will all interrupt
+each other, and oc will play if you have enabled both ch and oh on
+the same step.
+
+The conversion is performed in the browser, so none of the files will
+be uploaded anywhere.
+
+The kits should be placed in the same directory as your save files,
+and Pocket Acid will load them on startup. The filenames (except the
+file extension) must not exceed 8 characters in length.
+</pre>
+
+<script type="module">
+const {min, max, ceil} = Math;
+
+const SAMPLERATE = 32000;
+const ACCEPTABLE = "bd sd ch oh oc lt ht cy rs cp".split(" ");
+
+const result = document.getElementById("result");
+const uploaded = document.getElementById("uploaded");
+
+const error = (msg) => {
+	result.style = "color: red;";
+	result.innerHTML = msg;
+	uploaded.value = "";
+	throw new Error(msg);
+};
+
+const resample = async (f) => {
+	const decodeCtx = new AudioContext();
+	let original;
+
+	try {
+		original = await decodeCtx.decodeAudioData(await f.arrayBuffer());
+	} catch (err) {
+		error(`failed to decode sample: ${err}`);
+	}
+
+	if (original.sampleRate === SAMPLERATE) {
+		return original;
+	}
+
+	const resampleCtx = new OfflineAudioContext({
+		sampleRate: SAMPLERATE,
+		numberOfChannels: 1,
+		length: ceil(original.duration * SAMPLERATE),
+	});
+
+	const source = resampleCtx.createBufferSource();
+	source.buffer = original;
+	source.connect(resampleCtx.destination);
+	source.start();
+
+	return await resampleCtx.startRendering();
+};
+
+const writeString = (view, idx, str) => {
+	for (const c of str) {
+		view.setUint8(idx++, c.charCodeAt());
+	}
+	return idx;
+}
+
+uploaded.addEventListener("change", async () => {
+	result.innerHTML = "";
+
+	const kit = {};
+
+	for (const file of uploaded.files) {
+		const slot = file.name.split(".")[0];
+		if (!ACCEPTABLE.includes(slot)) {
+			error(`unacceptable filename: '${file.name}'`);
+		}
+		if (kit[slot] !== undefined) {
+			error(`duplicate files for '${slot}'`);
+		}
+		kit[slot] = file;
+	}
+
+	const missing = [];
+	for (const slot of ACCEPTABLE) {
+		if (kit[slot] === undefined) {
+			missing.push(slot);
+		}
+	}
+	if (missing.length !== 0) {
+		error(`missing sample(s) for ${missing.join(", ")}`);
+	}
+
+	let bufsize = 4; // magic bytes "PKIT"
+	for (const slot of ACCEPTABLE) {
+		kit[slot] = await resample(kit[slot]);
+
+		bufsize += 2; // slot name
+		bufsize += 4; // length
+		bufsize += kit[slot].length * 2; // sample data
+	}
+
+	const buf = new ArrayBuffer(bufsize);
+	const view = new DataView(buf);
+
+	let idx = 0;
+	idx = writeString(view, idx, "PKIT");
+
+	for (const slot of ACCEPTABLE) {
+		const samples = kit[slot].getChannelData(0);
+
+		idx = writeString(view, idx, slot);
+
+		view.setUint32(idx, samples.length * 2, true);
+		idx += 4;
+
+		for (let i = 0; i < samples.length; i++) {
+			const clamped = min(1, max(-1, samples[i]));
+			const i16 = clamped < 0 ? clamped * 0x8000 : clamped * 0x7fff;
+			view.setInt16(idx, i16, true);
+			idx += 2;
+		}
+	}
+
+	const blob = new Blob([buf], { type: "application/octet-stream" });
+
+	const link = document.createElement("a");
+	link.href = URL.createObjectURL(blob);
+	link.download = "kit.pkit";
+	link.innerHTML = "Download kit";
+
+	result.style = "color: darkgreen;";
+	result.innerHTML = "Success! ";
+	result.appendChild(link);
+
+	uploaded.value = "";
+});
+</script>
+
+</body>
+</html>
