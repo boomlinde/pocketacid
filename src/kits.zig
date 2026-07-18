@@ -61,6 +61,28 @@ pub fn idx(name: []const u8) !usize {
     return error.NoSuchKit;
 }
 
+// I would use readFileAlloc instead, but it uses statx which is not supported
+// by the older kernel used by ArkOS
+pub fn readFile(a: std.mem.Allocator, dir: std.fs.Dir, name: []const u8) ![]const u8 {
+    const file = try dir.openFile(name, .{ .mode = .read_only });
+    defer file.close();
+
+    // Get the size
+    try file.seekFromEnd(0);
+    const size = try file.getPos();
+    try file.seekTo(0);
+
+    const buf = try a.alloc(u8, size);
+    // is this buffer necessary?
+    var iobuf: [256]u8 = undefined;
+
+    var r = file.reader(&iobuf);
+
+    try r.interface.readSliceAll(buf);
+
+    return buf;
+}
+
 pub fn load(a: std.mem.Allocator, dir: std.fs.Dir) !void {
     const suffix = ".pkit";
     var iter = dir.iterate();
@@ -69,7 +91,7 @@ pub fn load(a: std.mem.Allocator, dir: std.fs.Dir) !void {
         switch (entry.kind) {
             .file, .sym_link => {
                 if (!std.mem.endsWith(u8, entry.name, suffix)) continue;
-                const content = try dir.readFileAlloc(a, entry.name, 4 * 1024 * 1024);
+                const content = try readFile(a, dir, entry.name);
                 const label = entry.name[0 .. entry.name.len - suffix.len];
                 try register(label, try Kit.parse(content));
             },
