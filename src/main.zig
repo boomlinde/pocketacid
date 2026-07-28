@@ -210,9 +210,9 @@ pub fn sequencer(
     var master_editor = MasterEditor{
         .left = &left_menu,
         .right = &.{
-            .{ .BassType = .{ .label = "bass1:", .ptr = &params.bass1.sound_type } },
-            .{ .BassType = .{ .label = "bass2:", .ptr = &params.bass2.sound_type } },
-            .spacer,
+            .{ .BassType = .{ .label = "bass1: ", .ptr = &params.bass1.sound_type } },
+            .{ .BassType = .{ .label = "bass2: ", .ptr = &params.bass2.sound_type } },
+            .{ .bool = .{ .label = "conted:", .ptr = &config.conted, .t = "yes", .f = "no" } },
             .spacer,
             .spacer,
             .spacer,
@@ -453,7 +453,20 @@ pub fn sequencer(
             switch (arranger.column) {
                 0, 1 => {
                     bass_editor.setPattern(p);
-                    if (!arrange and !dont_handle) bass_editor.handle(trig, config.autoadvance);
+                    if (!arrange and !dont_handle) {
+                        switch (bass_editor.handle(trig, config.autoadvance)) {
+                            .none => {},
+                            .next => if (config.conted) {
+                                arranger.nextRowLooping();
+                                bass_editor.setPattern(p);
+                            },
+                            .prev => if (config.conted) {
+                                arranger.prevRowLooping();
+                                bass_editor.setPattern(p);
+                                bass_editor.idx = bass_editor.selectedPattern().length() - 1;
+                            },
+                        }
+                    }
                     bass_editor.display(
                         &tm,
                         10,
@@ -466,7 +479,20 @@ pub fn sequencer(
                 },
                 2 => {
                     drum_editor.setPattern(p);
-                    if (!arrange and !dont_handle) drum_editor.handle(trig, config.autoadvance);
+                    if (!arrange and !dont_handle) {
+                        switch (drum_editor.handle(trig, config.autoadvance)) {
+                            .none => {},
+                            .next => if (config.conted) {
+                                arranger.nextRowLooping();
+                                drum_editor.setPattern(p);
+                            },
+                            .prev => if (config.conted) {
+                                arranger.prevRowLooping();
+                                drum_editor.setPattern(p);
+                                drum_editor.idx = drum_editor.selectedPattern().length() - 1;
+                            },
+                        }
+                    }
                     drum_editor.display(
                         &tm,
                         10,

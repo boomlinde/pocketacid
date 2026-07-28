@@ -29,33 +29,45 @@ idx: u8 = 0,
 blink: f32 = 0,
 drumtype: DrumPattern.DrumType = .bd,
 
-pub fn handle(self: *@This(), input: InputState, autoadvance: bool) void {
+const Request = enum { none, prev, next };
+
+pub fn handle(self: *@This(), input: InputState, autoadvance: bool) Request {
     if (input.hold.any()) self.blink = 0;
 
     if (input.hold.x) {
         if (input.repeat.left) self.rotLeft();
         if (input.repeat.right) self.rotRight();
-        return;
+        return .none;
     }
 
     if (input.hold.y) {
         if (input.repeat.left) self.selectedPattern().decLength();
         if (input.repeat.right) self.selectedPattern().incLength();
-        return;
+        return .none;
     }
 
-    if (input.repeat.up) self.drumtype.prev();
-    if (input.repeat.down) self.drumtype.next();
-    if (input.repeat.left) self.prevIdx();
-    if (input.repeat.right) self.nextIdx();
+    if (input.repeat.up) {
+        self.drumtype.prev();
+        return .none;
+    }
+    if (input.repeat.down) {
+        self.drumtype.next();
+        return .none;
+    }
+    if (input.repeat.left) return self.prevIdx();
+    if (input.repeat.right) return self.nextIdx();
     if (input.repeat.a) {
         self.selectedStep().toggle(self.drumtype);
-        if (autoadvance) self.nextIdx();
+        if (autoadvance) return self.nextIdx();
+        return .none;
     }
     if (input.repeat.b) {
         self.selectedStep().set(self.drumtype, false);
-        if (autoadvance) self.nextIdx();
+        if (autoadvance) return self.nextIdx();
+        return .none;
     }
+
+    return .none;
 }
 
 pub fn display(
@@ -119,7 +131,7 @@ fn selectedStep(self: *const @This()) *DrumPattern.Step {
     return &self.selectedPattern().steps[self.idx];
 }
 
-fn selectedPattern(self: *const @This()) *DrumPattern {
+pub fn selectedPattern(self: *const @This()) *DrumPattern {
     return &self.bank[self.pattern_idx];
 }
 
@@ -128,15 +140,19 @@ pub inline fn setPattern(self: *@This(), pat: u8) void {
     self.idx = @min(self.idx, self.selectedPattern().length() - 1);
 }
 
-inline fn nextIdx(self: *@This()) void {
-    self.idx = (self.idx + 1) % self.selectedPattern().len;
+inline fn nextIdx(self: *@This()) Request {
+    self.idx = (self.idx + 1) % self.selectedPattern().length();
+    return if (self.idx == 0) .next else .none;
 }
 
-inline fn prevIdx(self: *@This()) void {
-    self.idx = if (self.idx != 0)
-        (self.idx - 1) % self.selectedPattern().len
-    else
-        self.selectedPattern().len - 1;
+inline fn prevIdx(self: *@This()) Request {
+    if (self.idx != 0) {
+        self.idx = (self.idx - 1) % self.selectedPattern().length();
+        return .none;
+    } else {
+        self.idx = self.selectedPattern().length() - 1;
+        return .prev;
+    }
 }
 
 fn rotLeft(self: *@This()) void {

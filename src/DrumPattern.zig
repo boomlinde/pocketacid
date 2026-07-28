@@ -136,7 +136,7 @@ pub fn empty(self: *const @This()) bool {
 }
 
 pub fn copy(self: *const @This()) @This() {
-    const len = @atomicLoad(u8, &self.len, .seq_cst);
+    const len = self.length();
     var steps: [maxlen]Step = undefined;
 
     for (0..maxlen) |i| steps[i] = self.steps[i].copy();

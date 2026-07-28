@@ -71,6 +71,8 @@ const Row = enum {
     }
 };
 
+const Request = enum { none, prev, next };
+
 bank: []BassPattern,
 pattern_idx: usize = 0,
 idx: usize = 0,
@@ -84,15 +86,21 @@ pub inline fn setPattern(self: *@This(), pat: u8) void {
     self.idx = @min(self.idx, self.selectedPattern().length() - 1);
 }
 
-pub fn handle(self: *@This(), input: InputState, autoadvance: bool) void {
+pub fn handle(self: *@This(), input: InputState, autoadvance: bool) Request {
     const step = self.selectedStep();
 
     if (input.hold.any()) self.blink = 0;
 
-    if (input.combo("up")) self.row.prev();
-    if (input.combo("down")) self.row.next();
-    if (input.combo("right")) self.nextIdx();
-    if (input.combo("left")) self.prevIdx();
+    if (input.combo("up")) {
+        self.row.prev();
+        return .none;
+    }
+    if (input.combo("down")) {
+        self.row.next();
+        return .none;
+    }
+    if (input.combo("right")) return self.nextIdx();
+    if (input.combo("left")) return self.prevIdx();
 
     if (input.hold.y) {
         const sp = self.selectedPattern();
@@ -105,7 +113,7 @@ pub fn handle(self: *@This(), input: InputState, autoadvance: bool) void {
         if (input.repeat.up) self.selectedPattern().incBase();
         if (input.repeat.down) self.selectedPattern().decBase();
 
-        return;
+        return .none;
     }
 
     if (input.hold.x) {
@@ -113,7 +121,7 @@ pub fn handle(self: *@This(), input: InputState, autoadvance: bool) void {
         if (input.repeat.down) self.decRight();
         if (input.repeat.left) self.rotLeft();
         if (input.repeat.right) self.rotRight();
-        return;
+        return .none;
     }
 
     if (self.row == .pitch) {
@@ -148,7 +156,7 @@ pub fn handle(self: *@This(), input: InputState, autoadvance: bool) void {
                 step.assume(sc);
             }
             self.changedpitch = false;
-            if (autoadvance) self.nextIdx();
+            if (autoadvance) return self.nextIdx();
         }
     }
 
@@ -158,25 +166,25 @@ pub fn handle(self: *@This(), input: InputState, autoadvance: bool) void {
             var c = step.copy();
             c.octup = !c.octup;
             step.assume(c);
-            if (autoadvance) self.nextIdx();
+            if (autoadvance) return self.nextIdx();
         },
         .octdown => {
             var c = step.copy();
             c.octdown = !c.octdown;
             step.assume(c);
-            if (autoadvance) self.nextIdx();
+            if (autoadvance) return self.nextIdx();
         },
         .slide => {
             var c = step.copy();
             c.slide = !c.slide;
             step.assume(c);
-            if (autoadvance) self.nextIdx();
+            if (autoadvance) return self.nextIdx();
         },
         .accent => {
             var c = step.copy();
             c.accent = !c.accent;
             step.assume(c);
-            if (autoadvance) self.nextIdx();
+            if (autoadvance) return self.nextIdx();
         },
     };
 
@@ -185,52 +193,58 @@ pub fn handle(self: *@This(), input: InputState, autoadvance: bool) void {
             var c = step.copy();
             c.pitch = BassPattern.off;
             step.assume(c);
-            if (autoadvance) self.nextIdx();
+            if (autoadvance) return self.nextIdx();
         },
         .octup => {
             var c = step.copy();
             c.octup = false;
             step.assume(c);
-            if (autoadvance) self.nextIdx();
+            if (autoadvance) return self.nextIdx();
         },
         .octdown => {
             var c = step.copy();
             c.octdown = false;
             step.assume(c);
-            if (autoadvance) self.nextIdx();
+            if (autoadvance) return self.nextIdx();
         },
         .slide => {
             var c = step.copy();
             c.slide = false;
             step.assume(c);
-            if (autoadvance) self.nextIdx();
+            if (autoadvance) return self.nextIdx();
         },
         .accent => {
             var c = step.copy();
             c.accent = false;
             step.assume(c);
-            if (autoadvance) self.nextIdx();
+            if (autoadvance) return self.nextIdx();
         },
     };
+
+    return .none;
 }
 
 fn selectedStep(self: *const @This()) *BassPattern.Step {
     return &self.selectedPattern().steps[self.idx];
 }
 
-fn selectedPattern(self: *const @This()) *BassPattern {
+pub fn selectedPattern(self: *const @This()) *BassPattern {
     return &self.bank[self.pattern_idx];
 }
 
-fn nextIdx(self: *@This()) void {
-    self.idx = (self.idx + 1) % self.selectedPattern().len;
+fn nextIdx(self: *@This()) Request {
+    self.idx = (self.idx + 1) % self.selectedPattern().length();
+    return if (self.idx == 0) .next else .none;
 }
 
-fn prevIdx(self: *@This()) void {
-    self.idx = if (self.idx != 0)
-        (self.idx - 1) % self.selectedPattern().len
-    else
-        self.selectedPattern().len - 1;
+fn prevIdx(self: *@This()) Request {
+    if (self.idx != 0) {
+        self.idx = (self.idx - 1) % self.selectedPattern().length();
+        return .none;
+    } else {
+        self.idx = self.selectedPattern().length() - 1;
+        return .prev;
+    }
 }
 
 fn incRight(self: *@This()) void {

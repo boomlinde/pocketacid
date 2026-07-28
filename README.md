@@ -499,9 +499,9 @@ Controls:
 
 ### Settings
 
-    drive:      00 bass1: pd
-    accent:     00 bass2: pd
-    duck time:  40
+    drive:      00 bass1:  pd
+    accent:     00 bass2:  pd
+    duck time:  40 conted: no
     delay time: 40
     delay fb:   80
     delay duck: 80
@@ -526,6 +526,10 @@ These musical settings are included in snapshots:
   16th note swing
 * drum kit: the built-in drum kit sample set to use
 * bass1 and bass2: the synthesis mode of the bassline synthesizers
+* conted: whether or not to edit pattern blocks continuously. When enabled,
+  the arranger will automatically advance to the next pattern in the same
+  continuous block when you reach the end of a pattern, and back to the
+  previous as you move the cursor back past the first step.
 
 These settings concern the whole program and are not included in snapshots:
 

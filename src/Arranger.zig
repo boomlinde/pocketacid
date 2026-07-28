@@ -246,6 +246,30 @@ pub fn handle(self: *Arranger, input: InputState) ?Request {
     return null;
 }
 
+pub fn nextRowLooping(self: *Arranger) void {
+    if (self.selectedPattern() == null) return;
+    self.nextRow();
+    if (self.selectedPattern() == null) {
+        self.prevRow();
+        while (self.selectedPattern() != null) {
+            self.prevRow();
+        }
+        self.nextRow();
+    }
+}
+
+pub fn prevRowLooping(self: *Arranger) void {
+    if (self.selectedPattern() == null) return;
+    self.prevRow();
+    if (self.selectedPattern() == null) {
+        self.nextRow();
+        while (self.selectedPattern() != null) {
+            self.nextRow();
+        }
+        self.prevRow();
+    }
+}
+
 inline fn nextRow(self: *Arranger) void {
     self.row +%= 1;
 }

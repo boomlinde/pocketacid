@@ -34,7 +34,7 @@ pub fn empty(self: *const @This()) bool {
 }
 
 pub fn copy(self: *const @This()) @This() {
-    const len = @atomicLoad(u8, &self.len, .seq_cst);
+    const len = self.length();
     const base = @atomicLoad(u7, &self.base, .seq_cst);
     var steps: [maxlen]Step = undefined;
 
