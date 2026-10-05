@@ -38,6 +38,7 @@ pub const Params = struct {
 
     decay: f32 = 0.2,
     accentness: f32 = 0.3,
+    fb_ratio: u8 = 0.0,
 };
 
 const param_smooth_time = 0.1;
@@ -55,7 +56,6 @@ legato: MonoLegato = .{ .time = 0.06 },
 man: MonoVoiceManager = .{},
 amp_env: ADREnv = .{},
 prev: f32 = 0,
-prev_res: f32 = 0,
 mod_env: ADEnv = .{},
 prev_gate: bool = false,
 current_mul: f32 = 1,
@@ -83,6 +83,13 @@ pub inline fn next(self: *DigiBass, srate: f32) f32 {
     };
 }
 
+pub inline fn storeFeedback(self: *DigiBass, ratio: u8, in: f32) void {
+    const float_ratio = @as(f32, @floatFromInt(ratio)) / 256.0;
+    const prev_level: f32 = float_ratio;
+    const in_level: f32 = 1 - float_ratio;
+    self.prev = (in * in_level + self.prev * prev_level);
+}
+
 pub inline fn nextFM(self: *DigiBass, srate: f32) f32 {
     const accentness_raw = self.accentness_smooth.next(a.get(self.params, .accentness), param_smooth_time, srate);
     const bend = self.bend_smooth.next(self.bend, bend_smooth_time, srate);
@@ -91,6 +98,7 @@ pub inline fn nextFM(self: *DigiBass, srate: f32) f32 {
     const mod = self.mod_smooth.next(a.get(self.params, .mod_depth), param_smooth_time, srate);
     const feedback = self.feedback_smooth.next(a.get(self.params, .feedback), param_smooth_time, srate);
     const state = self.legato.next(self.man.state, srate);
+    const fb_ratio = a.get(self.params, .fb_ratio);
 
     if (self.man.state.gate and !self.prev_gate) {
         self.mod_env.trigger();
@@ -154,8 +162,9 @@ pub inline fn nextFM(self: *DigiBass, srate: f32) f32 {
         @sin(self.phase * self.current_mul * std.math.tau);
 
     const mod_total = mod_wave * 8 * total_mod * falloff + fb;
-    self.prev = clamp(@sin(std.math.tau * (self.phase + mod_total))) * amp;
-    return self.prev;
+    const out = clamp(@sin(std.math.tau * (self.phase + mod_total))) * amp;
+    self.storeFeedback(fb_ratio, out);
+    return out;
 }
 
 pub inline fn nextPD(self: *DigiBass, srate: f32) f32 {
@@ -166,6 +175,7 @@ pub inline fn nextPD(self: *DigiBass, srate: f32) f32 {
     const mod = self.mod_smooth.next(a.get(self.params, .mod_depth), param_smooth_time, srate);
     const feedback = self.feedback_smooth.next(a.get(self.params, .feedback), param_smooth_time, srate);
     const state = self.legato.next(self.man.state, srate);
+    const fb_ratio = a.get(self.params, .fb_ratio);
 
     const res2_amp = r2a: {
         const flat_timbre = @max(0, timbre * 2 - 1);
@@ -230,15 +240,15 @@ pub inline fn nextPD(self: *DigiBass, srate: f32) f32 {
     const falloff2 = falloffFunc(@mod(self.phase + 0.5, 1), res);
     const nt_notrack = total_mod * (1 - clamp01((pitch - 24) / 96));
     const t: OscType = if (timbre > 0.5) .sqr else .saw;
-    self.prev_res = 2 * res * falloff * falloff * falloff * @sin(self.res_phase * std.math.tau);
-    self.prev_res += res2_amp * (-2 * res * falloff2 * falloff2 * falloff2 * @sin(self.res2_phase * std.math.tau));
-    self.prev = clamp((pdparams(clamp01(nt_notrack), t).wave(self.phase + fb) * 1 + self.prev_res)) * amp;
-    return self.prev;
+    const res_wave = 2 * res * falloff * falloff * falloff * @sin(self.res_phase * std.math.tau) +
+        res2_amp * (-2 * res * falloff2 * falloff2 * falloff2 * @sin(self.res2_phase * std.math.tau));
+    const out = clamp((pdparams(clamp01(nt_notrack), t).wave(self.phase + fb) * 1 + res_wave)) * amp;
+    self.storeFeedback(fb_ratio, out);
+    return out;
 }
 
 pub inline fn falloffFunc(phase: f32, factor: f32) f32 {
     return @max(0, 1 - phase / @max(0.01, factor));
-    // return 1 - phase;
 }
 
 pub fn handleMidiEvent(self: *DigiBass, event: midi.Event) void {

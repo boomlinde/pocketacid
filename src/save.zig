@@ -200,6 +200,15 @@ fn readSnapshots(r: *std.io.Reader, snapshots: *[256]Snapshot, version: u16, len
                 @atomicStore(bool, &snapshots[i].enabled, enabled, .seq_cst);
             }
         },
+        4 => {
+            if (len != 84 * 256) return error.SnapshotsBadLength;
+
+            for (0..256) |i| {
+                const enabled = 0 != (try r.takeInt(u8, .little));
+                try bareReadParams(r, &snapshots[i].params, 4);
+                @atomicStore(bool, &snapshots[i].enabled, enabled, .seq_cst);
+            }
+        },
         else => return error.SnapshotsBadVersion,
     }
 }
@@ -217,6 +226,10 @@ fn readParams(r: *std.io.Reader, params: *Params, version: u16, len: u16) !void 
         3 => {
             if (len != 81) return error.BadParamLen;
             try bareReadParams(r, params, 3);
+        },
+        4 => {
+            if (len != 83) return error.BadParamLen;
+            try bareReadParams(r, params, 4);
         },
         else => return error.BadParamVersion,
     }
@@ -239,6 +252,10 @@ fn bareReadParams(r: *std.io.Reader, params: *Params, version: u16) !void {
             try readBassPatch2(r, &params.bass1);
             try readBassPatch2(r, &params.bass2);
         },
+        4 => {
+            try readBassPatch3(r, &params.bass1);
+            try readBassPatch3(r, &params.bass2);
+        },
         else => return error.UnsupportedVersion,
     }
 
@@ -252,7 +269,7 @@ fn bareReadParams(r: *std.io.Reader, params: *Params, version: u16) !void {
             const kit = try kits.idx(&kitnamebuf);
             a.set(&params.drums, .kit, kit);
         },
-        3 => {
+        3, 4 => {
             const len = try r.takeInt(u8, .little);
             var kitnamebuf: [kits.MAX_NAME_LEN]u8 = undefined;
             try r.readSliceAll(&kitnamebuf);
@@ -296,6 +313,17 @@ fn readBassPatch2(r: *std.io.Reader, params: *DigiBass.Params) !void {
     a.set(params, .feedback, try readFloat01(r));
     a.set(params, .decay, try readFloat01(r));
     a.set(params, .accentness, try readFloat01(r));
+}
+
+fn readBassPatch3(r: *std.io.Reader, params: *DigiBass.Params) !void {
+    a.set(params, .sound_type, @enumFromInt(try r.takeInt(u8, .little)));
+    a.set(params, .timbre, try readFloat01(r));
+    a.set(params, .mod_depth, try readFloat01(r));
+    a.set(params, .res, try readFloat01(r));
+    a.set(params, .feedback, try readFloat01(r));
+    a.set(params, .decay, try readFloat01(r));
+    a.set(params, .accentness, try readFloat01(r));
+    a.set(params, .fb_ratio, try r.takeInt(u8, .little));
 }
 
 fn readMixerEditorState(r: *std.io.Reader, mixer_editor: *MixerEditor, version: u16, len: u16) !void {
@@ -455,7 +483,7 @@ pub fn saveWriter(w: *std.io.Writer, s: State) !void {
     }
 
     {
-        var handle = beginChunk(.PARM, 3);
+        var handle = beginChunk(.PARM, 4);
         try writeParams(&handle.w, s.params);
         try handle.finalize(w);
     }
@@ -482,7 +510,7 @@ pub fn saveWriter(w: *std.io.Writer, s: State) !void {
     }
 
     {
-        var handle = beginChunk(.SNAP, 3);
+        var handle = beginChunk(.SNAP, 4);
         for (0..256) |i| {
             const snap_idx = @atomicLoad(u8, &s.snap_map[i], .seq_cst);
             try handle.w.writeInt(u8, if (s.snapshots[snap_idx].active()) 1 else 0, .little);
@@ -532,6 +560,7 @@ fn writeBassParams(w: *std.io.Writer, params: *const DigiBass.Params) !void {
     try writeParam01(w, a.get(params, .feedback));
     try writeParam01(w, a.get(params, .decay));
     try writeParam01(w, a.get(params, .accentness));
+    try w.writeInt(u8, a.get(params, .fb_ratio), .little);
 }
 
 fn writeParam01(w: *std.io.Writer, val: f32) !void {

@@ -502,8 +502,8 @@ Controls:
     drive:      00 bass1:  pd
     accent:     00 bass2:  pd
     duck time:  40 conted: no
-    delay time: 40
-    delay fb:   80
+    delay time: 40 fbr1:   00
+    delay fb:   80 fbr2:   00
     delay duck: 80
     swing:      00
     drum kit:   R7
@@ -539,6 +539,10 @@ These settings concern the whole program and are not included in snapshots:
 * auto-adv: auto-advance cursor in pattern sequencer or not
 * fullscr: toggle fullscreen
 * joyless: activate joyless mode (see Joyless mode in the controls section)
+* fbr1 and fbr2: controls the coefficient of a one-pole smoothing filter
+  for the feedback. The higher the value, the "smoother" and less prone to
+  noise the feedback signal will be. At value 0, there is no smoothing at
+  all and the feeback will work as it did in previous versions.
 
 Controls:
 
